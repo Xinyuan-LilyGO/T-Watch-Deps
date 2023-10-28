@@ -13,7 +13,9 @@
 // Include processor specific header
 #include "soc/spi_reg.h"
 #include "driver/spi_master.h"
-
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)
+#include "hal/gpio_ll.h"
+#endif
 #if !defined(CONFIG_IDF_TARGET_ESP32S3) && !defined(CONFIG_IDF_TARGET_ESP32S2) && !defined(CONFIG_IDF_TARGET_ESP32)
   #define CONFIG_IDF_TARGET_ESP32
 #endif

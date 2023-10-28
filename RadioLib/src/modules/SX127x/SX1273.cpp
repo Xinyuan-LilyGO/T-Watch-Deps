@@ -7,7 +7,8 @@ SX1273::SX1273(Module* mod) : SX1272(mod) {
 
 int16_t SX1273::begin(float freq, float bw, uint8_t sf, uint8_t cr, uint8_t syncWord, int8_t power, uint16_t preambleLength, uint8_t gain) {
   // execute common part
-  int16_t state = SX127x::begin(RADIOLIB_SX1272_CHIP_VERSION, syncWord, preambleLength);
+  uint8_t version = RADIOLIB_SX1272_CHIP_VERSION;
+  int16_t state = SX127x::begin(&version, 1, syncWord, preambleLength);
   RADIOLIB_ASSERT(state);
 
   // configure publicly accessible settings
@@ -61,6 +62,31 @@ int16_t SX1273::setSpreadingFactor(uint8_t sf) {
   int16_t state = setSpreadingFactorRaw(newSpreadingFactor);
   if(state == RADIOLIB_ERR_NONE) {
     SX127x::spreadingFactor = sf;
+  }
+
+  return(state);
+}
+
+int16_t SX1273::setDataRate(DataRate_t dr) {
+  int16_t state = RADIOLIB_ERR_UNKNOWN;
+
+  // select interpretation based on active modem
+  uint8_t modem = this->getActiveModem();
+  if(modem == RADIOLIB_SX127X_FSK_OOK) {
+    // set the bit rate
+    state = this->setBitRate(dr.fsk.bitRate);
+    RADIOLIB_ASSERT(state);
+
+    // set the frequency deviation
+    state = this->setFrequencyDeviation(dr.fsk.freqDev);
+
+  } else if(modem == RADIOLIB_SX127X_LORA) {
+    // set the spreading factor
+    state = this->setSpreadingFactor(dr.lora.spreadingFactor);
+    RADIOLIB_ASSERT(state);
+
+    // set the bandwidth
+    state = this->setBandwidth(dr.lora.bandwidth);
   }
 
   return(state);

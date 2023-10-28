@@ -1,10 +1,13 @@
-// ST7789 240 x 240 display
+// ST7789 240 x 320 display with no chip select line
 #define USER_SETUP_ID 212
 
 #define ST7789_DRIVER     // Configure all registers
 
 #define TFT_WIDTH  240
 #define TFT_HEIGHT 240
+
+//#define TFT_RGB_ORDER TFT_RGB  // Colour order Red-Green-Blue
+//#define TFT_RGB_ORDER TFT_BGR  // Colour order Blue-Green-Red
 
 #define TFT_INVERSION_ON
 //#define TFT_INVERSION_OFF

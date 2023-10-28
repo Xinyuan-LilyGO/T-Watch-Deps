@@ -81,8 +81,9 @@ class STM32WLx : public SX1262 {
       This automatically switches between the low-power (LP) and high-power (HP) amplifier.
 
       LP is preferred and supports -17 to +14dBm. When a higher power is
-      requested (or the LP amplifier is marked as unvailable using
-      setRfSwitchTable()), HP is used, which supports -9 to +22dBm.
+      requested (or the LP amplifier is marked as unavailable using
+      setRfSwitchTable()), HP is used, which supports -9 to +22dBm. If the LP is marked as unavailable,
+      HP output will be used instead.
 
       \param power Output power to be set in dBm.
 
@@ -118,6 +119,39 @@ class STM32WLx : public SX1262 {
       \brief Clears interrupt service routine to call when DIO1/2/3 activates.
     */
     void clearDio1Action();
+
+    /*!
+      \brief Sets interrupt service routine to call when a packet is received.
+      \param func ISR to call.
+    */
+    void setPacketReceivedAction(void (*func)(void));
+
+    /*!
+      \brief Clears interrupt service routine to call when a packet is received.
+    */
+    void clearPacketReceivedAction();
+
+    /*!
+      \brief Sets interrupt service routine to call when a packet is sent.
+      \param func ISR to call.
+    */
+    void setPacketSentAction(void (*func)(void));
+
+    /*!
+      \brief Clears interrupt service routine to call when a packet is sent.
+    */
+    void clearPacketSentAction();
+
+    /*!
+      \brief Sets interrupt service routine to call when a channel scan is finished.
+      \param func ISR to call.
+    */
+    void setChannelScanAction(void (*func)(void));
+
+    /*!
+      \brief Clears interrupt service routine to call when a channel scan is finished.
+    */
+    void clearChannelScanAction();
 
 #if !defined(RADIOLIB_GODMODE)
   protected:

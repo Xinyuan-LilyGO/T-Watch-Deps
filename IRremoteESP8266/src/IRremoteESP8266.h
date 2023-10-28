@@ -924,6 +924,27 @@
 #define SEND_DAIKIN312      _IR_ENABLE_DEFAULT_
 #endif  // SEND_DAIKIN312
 
+#ifndef DECODE_GORENJE
+#define DECODE_GORENJE      _IR_ENABLE_DEFAULT_
+#endif  // DECODE_GORENJE
+#ifndef SEND_GORENJE
+#define SEND_GORENJE        _IR_ENABLE_DEFAULT_
+#endif  // SEND_GORENJE
+
+#ifndef DECODE_WOWWEE
+#define DECODE_WOWWEE      _IR_ENABLE_DEFAULT_
+#endif  // DECODE_WOWWEE
+#ifndef SEND_WOWWEE
+#define SEND_WOWWEE        _IR_ENABLE_DEFAULT_
+#endif  // SEND_WOWWEE
+
+#ifndef DECODE_CARRIER_AC84
+#define DECODE_CARRIER_AC84 _IR_ENABLE_DEFAULT_
+#endif  // DECODE_CARRIER_AC84
+#ifndef SEND_CARRIER_AC84
+#define SEND_CARRIER_AC84   _IR_ENABLE_DEFAULT_
+#endif  // SEND_CARRIER_AC84
+
 #if (DECODE_ARGO || DECODE_DAIKIN || DECODE_FUJITSU_AC || DECODE_GREE || \
      DECODE_KELVINATOR || DECODE_MITSUBISHI_AC || DECODE_TOSHIBA_AC || \
      DECODE_TROTEC || DECODE_HAIER_AC || DECODE_HITACHI_AC || \
@@ -942,6 +963,7 @@
      DECODE_KELON168 || DECODE_HITACHI_AC296 || DECODE_CARRIER_AC128 || \
      DECODE_DAIKIN200 || DECODE_HAIER_AC160 || DECODE_TCL96AC || \
      DECODE_BOSCH144 || DECODE_SANYO_AC152 || DECODE_DAIKIN312 || \
+     DECODE_CARRIER_AC84 || \
      false)
   // Add any DECODE to the above if it uses result->state (see kStateSizeMax)
   // you might also want to add the protocol to hasACState function
@@ -1104,8 +1126,11 @@ enum decode_type_t {
   BOSCH144,  // 120
   SANYO_AC152,
   DAIKIN312,
+  GORENJE,
+  WOWWEE,
+  CARRIER_AC84,  // 125
   // Add new entries before this one, and update it to point to the last entry.
-  kLastDecodeType = DAIKIN312,
+  kLastDecodeType = CARRIER_AC84,
 };
 
 // Message lengths & required repeat values
@@ -1123,7 +1148,13 @@ const uint16_t kAmcorStateLength = 8;
 const uint16_t kAmcorBits = kAmcorStateLength * 8;
 const uint16_t kAmcorDefaultRepeat = kSingleRepeat;
 const uint16_t kArgoStateLength = 12;
+const uint16_t kArgoShortStateLength = 4;
 const uint16_t kArgoBits = kArgoStateLength * 8;
+const uint16_t kArgoShortBits = kArgoShortStateLength * 8;
+const uint16_t kArgo3AcControlStateLength = 6;  // Bytes
+const uint16_t kArgo3iFeelReportStateLength = 2;  // Bytes
+const uint16_t kArgo3TimerStateLength = 9;  // Bytes
+const uint16_t kArgo3ConfigStateLength = 4;  // Bytes
 const uint16_t kArgoDefaultRepeat = kNoRepeat;
 const uint16_t kArrisBits = 32;
 const uint16_t kBosch144StateLength = 18;
@@ -1137,6 +1168,9 @@ const uint16_t kCarrierAc40Bits = 40;
 const uint16_t kCarrierAc40MinRepeat = 2;
 const uint16_t kCarrierAc64Bits = 64;
 const uint16_t kCarrierAc64MinRepeat = kNoRepeat;
+const uint16_t kCarrierAc84StateLength = 11;
+const uint16_t kCarrierAc84Bits = kCarrierAc84StateLength * 8 - 4;
+const uint16_t kCarrierAc84MinRepeat = kNoRepeat;
 const uint16_t kCarrierAc128StateLength = 16;
 const uint16_t kCarrierAc128Bits = kCarrierAc128StateLength * 8;
 const uint16_t kCarrierAc128MinRepeat = kNoRepeat;
@@ -1203,6 +1237,7 @@ const uint16_t kGicableBits = 16;
 const uint16_t kGicableMinRepeat = kSingleRepeat;
 const uint16_t kGoodweatherBits = 48;
 const uint16_t kGoodweatherMinRepeat = kNoRepeat;
+const uint16_t kGorenjeBits = 8;
 const uint16_t kGreeStateLength = 8;
 const uint16_t kGreeBits = kGreeStateLength * 8;
 const uint16_t kGreeDefaultRepeat = kNoRepeat;
@@ -1372,6 +1407,8 @@ const uint16_t kWhirlpoolAcStateLength = 21;
 const uint16_t kWhirlpoolAcBits = kWhirlpoolAcStateLength * 8;
 const uint16_t kWhirlpoolAcDefaultRepeat = kNoRepeat;
 const uint16_t kWhynterBits = 32;
+const uint16_t kWowweeBits = 11;
+const uint16_t kWowweeDefaultRepeat = kNoRepeat;
 const uint8_t  kVestelAcBits = 56;
 const uint16_t kXmpBits = 64;
 const uint16_t kZepealBits = 16;

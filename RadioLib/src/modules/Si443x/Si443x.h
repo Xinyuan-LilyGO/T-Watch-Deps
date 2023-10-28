@@ -657,6 +657,28 @@ class Si443x: public PhysicalLayer {
     void clearIrqAction();
 
     /*!
+      \brief Sets interrupt service routine to call when a packet is received.
+      \param func ISR to call.
+    */
+    void setPacketReceivedAction(void (*func)(void));
+
+    /*!
+      \brief Clears interrupt service routine to call when a packet is received.
+    */
+    void clearPacketReceivedAction();
+
+    /*!
+      \brief Sets interrupt service routine to call when a packet is sent.
+      \param func ISR to call.
+    */
+    void setPacketSentAction(void (*func)(void));
+
+    /*!
+      \brief Clears interrupt service routine to call when a packet is sent.
+    */
+    void clearPacketSentAction();
+
+    /*!
       \brief Interrupt-driven binary transmit method. Will start transmitting arbitrary binary data up to 64 bytes long.
       \param data Binary data that will be transmitted.
       \param len Length of binary data to transmit (in bytes).
@@ -688,9 +710,10 @@ class Si443x: public PhysicalLayer {
     int16_t startReceive(uint32_t timeout, uint16_t irqFlags, uint16_t irqMask, size_t len);
 
     /*!
-      \brief Reads data that was received after calling startReceive method. This method reads len characters.
+      \brief Reads data that was received after calling startReceive method. When the packet length is not known in advance,
+      getPacketLength method must be called BEFORE calling readData!
       \param data Pointer to array to save the received binary data.
-      \param len Number of bytes that will be read. When set to 0, the packet length will be retreived automatically.
+      \param len Number of bytes that will be read. When set to 0, the packet length will be retrieved automatically.
       When more bytes than received are requested, only the number of bytes requested will be returned.
       \returns \ref status_codes
     */
@@ -776,7 +799,7 @@ class Si443x: public PhysicalLayer {
 
     #if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
     /*!
-      \brief Set interrupt service routine function to call when data bit is receveid in direct mode.
+      \brief Set interrupt service routine function to call when data bit is received in direct mode.
       \param func Pointer to interrupt service routine.
     */
     void setDirectAction(void (*func)(void));

@@ -55,12 +55,14 @@
 #if defined(RADIOLIB_DEBUG)
   #define RADIOLIB_VALUE_TO_STRING(x) #x
   #define RADIOLIB_VALUE(x) RADIOLIB_VALUE_TO_STRING(x)
-  #define RADIOLIB_VAR_NAME_VALUE(var) #var "="  RADIOLIB_VALUE(var)
-  #pragma message(RADIOLIB_VAR_NAME_VALUE(RADIOLIB_PLATFORM))
-  #pragma message(RADIOLIB_VAR_NAME_VALUE(RADIOLIB_VERSION_MAJOR))
-  #pragma message(RADIOLIB_VAR_NAME_VALUE(RADIOLIB_VERSION_MINOR))
-  #pragma message(RADIOLIB_VAR_NAME_VALUE(RADIOLIB_VERSION_PATCH))
-  #pragma message(RADIOLIB_VAR_NAME_VALUE(RADIOLIB_VERSION_EXTRA))
+  #pragma message("\nRadioLib Debug Info\nVersion " \
+  RADIOLIB_VALUE(RADIOLIB_VERSION_MAJOR) "." \
+  RADIOLIB_VALUE(RADIOLIB_VERSION_MINOR) "." \
+  RADIOLIB_VALUE(RADIOLIB_VERSION_PATCH) "." \
+  RADIOLIB_VALUE(RADIOLIB_VERSION_EXTRA) "\n" \
+  "Platform: " RADIOLIB_VALUE(RADIOLIB_PLATFORM) "\n" \
+  "Compiled: " RADIOLIB_VALUE(__DATE__) " " RADIOLIB_VALUE(__TIME__) \
+  )
 #endif
 
 // check unknown/unsupported platform
@@ -74,9 +76,6 @@
 #include "modules/RF69/RF69.h"
 #include "modules/RFM2x/RFM22.h"
 #include "modules/RFM2x/RFM23.h"
-#include "modules/RFM9x/RFM95.h"
-#include "modules/RFM9x/RFM96.h"
-#include "modules/RFM9x/RFM97.h"
 #include "modules/Si443x/Si4430.h"
 #include "modules/Si443x/Si4431.h"
 #include "modules/Si443x/Si4432.h"
@@ -107,6 +106,13 @@
 #include "protocols/FSK4/FSK4.h"
 #include "protocols/APRS/APRS.h"
 #include "protocols/ExternalRadio/ExternalRadio.h"
+#include "protocols/Print/Print.h"
+#include "protocols/BellModem/BellModem.h"
+#include "protocols/LoRaWAN/LoRaWAN.h"
+
+// utilities
+#include "utils/CRC.h"
+#include "utils/Cryptography.h"
 
 // only create Radio class when using RadioShield
 #if defined(RADIOLIB_RADIOSHIELD)

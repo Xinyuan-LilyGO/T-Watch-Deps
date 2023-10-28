@@ -3,6 +3,7 @@
 
 #include "../../TypeDef.h"
 #include "../PhysicalLayer/PhysicalLayer.h"
+#include "../../utils/FEC.h"
 
 // frequency shift in Hz
 #define RADIOLIB_PAGER_FREQ_SHIFT_HZ                            (4500)
@@ -45,21 +46,14 @@
 #define RADIOLIB_PAGER_BCH_BITS_MASK                            (0x000007FFUL)
 
 // message type functional bits
-#define RADIOLIB_PAGER_FUNC_BITS_NUMERIC                        (0b00UL << RADIOLIB_PAGER_FUNC_BITS_POS)
-#define RADIOLIB_PAGER_FUNC_BITS_TONE                           (0b01UL << RADIOLIB_PAGER_FUNC_BITS_POS)
-#define RADIOLIB_PAGER_FUNC_BITS_ALPHA                          (0b11UL << RADIOLIB_PAGER_FUNC_BITS_POS)
+#define RADIOLIB_PAGER_FUNC_BITS_NUMERIC                        (0b00)
+#define RADIOLIB_PAGER_FUNC_BITS_TONE                           (0b01)
+#define RADIOLIB_PAGER_FUNC_BITS_ACTIVATION                     (0b10)
+#define RADIOLIB_PAGER_FUNC_BITS_ALPHA                          (0b11)
+#define RADIOLIB_PAGER_FUNC_AUTO                                0xFF
 
 // the maximum allowed address (2^22 - 1)
 #define RADIOLIB_PAGER_ADDRESS_MAX                              (2097151)
-
-// BCH(31, 21) code constants
-#define RADIOLIB_PAGER_BCH_M                                    (5)
-#define RADIOLIB_PAGER_BCH_N                                    (31)
-#define RADIOLIB_PAGER_BCH_K                                    (21)
-#define RADIOLIB_PAGER_BCH_D                                    (5)
-
- // BCH(31, 21) primitive polynomial x^5 + x^2 + 1
-#define RADIOLIB_PAGER_BCH_PRIMITIVE_POLY                       (0x25)
 
 /*!
   \class PagerClient
@@ -98,9 +92,10 @@ class PagerClient {
       \param str Address of Arduino string that will be transmitted.
       \param addr Address of the destination pager. Allowed values are 0 to 2097151 - values above 2000000 are reserved.
       \param encoding Encoding to be used (BCD or ASCII). Defaults to RADIOLIB_PAGER_BCD.
+      \param function bits (NUMERIC, TONE, ACTIVATION, ALPHANUMERIC). Allowed values 0 to 3. Defaults to auto select by specified encoding
       \returns \ref status_codes
     */
-    int16_t transmit(String& str, uint32_t addr, uint8_t encoding = RADIOLIB_PAGER_BCD);
+    int16_t transmit(String& str, uint32_t addr, uint8_t encoding = RADIOLIB_PAGER_BCD, uint8_t function = RADIOLIB_PAGER_FUNC_AUTO);
     #endif
 
     /*!
@@ -108,9 +103,10 @@ class PagerClient {
       \param str C-string that will be transmitted.
       \param addr Address of the destination pager. Allowed values are 0 to 2097151 - values above 2000000 are reserved.
       \param encoding Encoding to be used (BCD or ASCII). Defaults to RADIOLIB_PAGER_BCD.
+      \param function bits (NUMERIC, TONE, ACTIVATION, ALPHANUMERIC). Allowed values 0 to 3. Defaults to auto select by specified encoding
       \returns \ref status_codes
     */
-    int16_t transmit(const char* str, uint32_t addr, uint8_t encoding = RADIOLIB_PAGER_BCD);
+    int16_t transmit(const char* str, uint32_t addr, uint8_t encoding = RADIOLIB_PAGER_BCD, uint8_t function = RADIOLIB_PAGER_FUNC_AUTO);
 
     /*!
       \brief Binary transmit method. Will transmit arbitrary binary data.
@@ -118,9 +114,10 @@ class PagerClient {
       \param len Length of binary data to transmit (in bytes).
       \param addr Address of the destination pager. Allowed values are 0 to 2097151 - values above 2000000 are reserved.
       \param encoding Encoding to be used (BCD or ASCII). Defaults to RADIOLIB_PAGER_BCD.
+      \param function bits (NUMERIC, TONE, ACTIVATION, ALPHANUMERIC). Allowed values 0 to 3. Defaults to auto select by specified encoding
       \returns \ref status_codes
     */
-    int16_t transmit(uint8_t* data, size_t len, uint32_t addr, uint8_t encoding = RADIOLIB_PAGER_BCD);
+    int16_t transmit(uint8_t* data, size_t len, uint32_t addr, uint8_t encoding = RADIOLIB_PAGER_BCD, uint8_t function = RADIOLIB_PAGER_FUNC_AUTO);
 
     #if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
     /*!
@@ -143,7 +140,7 @@ class PagerClient {
     /*!
       \brief Reads data that was received after calling startReceive method.
       \param str Address of Arduino String to save the received data.
-      \param len Expected number of characters in the message. When set to 0, the message lengthwill be retreived
+      \param len Expected number of characters in the message. When set to 0, the message length will be retrieved
       automatically. When more bytes than received are requested, only the number of bytes requested will be returned.
       \param addr Pointer to variable holding the address of the received pager message.
       Set to NULL to not retrieve address.
@@ -156,7 +153,7 @@ class PagerClient {
       \brief Reads data that was received after calling startReceive method.
       \param data Pointer to array to save the received message.
       \param len Pointer to variable holding the number of bytes that will be read. When set to 0, the packet length
-      will be retreived automatically. When more bytes than received are requested, only the number of bytes
+      will be retrieved automatically. When more bytes than received are requested, only the number of bytes
       requested will be returned. Upon completion, the number of bytes received will be written to this variable.
       \param addr Pointer to variable holding the address of the received pager message.
       Set to NULL to not retrieve address.
@@ -180,11 +177,6 @@ class PagerClient {
     uint32_t filterMask;
     bool inv = false;
 
-    // BCH encoder
-    int32_t bchAlphaTo[RADIOLIB_PAGER_BCH_N + 1];
-    int32_t bchIndexOf[RADIOLIB_PAGER_BCH_N + 1];
-    int32_t bchG[RADIOLIB_PAGER_BCH_N - RADIOLIB_PAGER_BCH_K + 1];
-
     void write(uint32_t* data, size_t len);
     void write(uint32_t codeWord);
 
@@ -194,9 +186,6 @@ class PagerClient {
 
     uint8_t encodeBCD(char c);
     char decodeBCD(uint8_t b);
-
-    void encoderInit();
-    uint32_t encodeBCH(uint32_t data);
 };
 
 #endif

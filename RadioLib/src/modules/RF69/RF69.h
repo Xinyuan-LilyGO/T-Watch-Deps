@@ -98,8 +98,8 @@
 
 // RF69 modem settings
 // RADIOLIB_RF69_REG_OP_MODE                                                  MSB   LSB   DESCRIPTION
-#define RADIOLIB_RF69_SEQUENCER_OFF                             0b00000000  //  7     7   disable automatic sequencer
-#define RADIOLIB_RF69_SEQUENCER_ON                              0b10000000  //  7     7   enable automatic sequencer
+#define RADIOLIB_RF69_SEQUENCER_OFF                             0b10000000  //  7     7   disable automatic sequencer
+#define RADIOLIB_RF69_SEQUENCER_ON                              0b00000000  //  7     7   enable automatic sequencer
 #define RADIOLIB_RF69_LISTEN_OFF                                0b00000000  //  6     6   disable Listen mode
 #define RADIOLIB_RF69_LISTEN_ON                                 0b01000000  //  6     6   enable Listen mode
 #define RADIOLIB_RF69_LISTEN_ABORT                              0b00100000  //  5     5   abort Listen mode (has to be set together with RF69_LISTEN_OFF)
@@ -124,7 +124,7 @@
 
 // RADIOLIB_RF69_REG_BITRATE_MSB + REG_BITRATE_LSB
 #define RADIOLIB_RF69_BITRATE_MSB                               0x1A        //  7     0   bit rate setting: rate = F(XOSC) / BITRATE
-#define RADIOLIB_RF69_BITRATE_LSB                               0x0B        //  7     0       default value: 4.8 kbps                            0x40        //  7     0
+#define RADIOLIB_RF69_BITRATE_LSB                               0x0B        //  7     0       default value: 4.8 kbps
 
 // RADIOLIB_RF69_REG_FDEV_MSB + REG_FDEV_LSB
 #define RADIOLIB_RF69_FDEV_MSB                                  0x00        //  5     0   frequency deviation: f_dev = f_step * FDEV
@@ -618,6 +618,28 @@ class RF69: public PhysicalLayer {
     void clearDio1Action();
 
     /*!
+      \brief Sets interrupt service routine to call when a packet is received.
+      \param func ISR to call.
+    */
+    void setPacketReceivedAction(void (*func)(void));
+
+    /*!
+      \brief Clears interrupt service routine to call when a packet is received.
+    */
+    void clearPacketReceivedAction();
+
+    /*!
+      \brief Sets interrupt service routine to call when a packet is sent.
+      \param func ISR to call.
+    */
+    void setPacketSentAction(void (*func)(void));
+
+    /*!
+      \brief Clears interrupt service routine to call when a packet is sent.
+    */
+    void clearPacketSentAction();
+
+    /*!
       \brief Set interrupt service routine function to call when FIFO is empty.
       \param func Pointer to interrupt service routine.
     */
@@ -649,7 +671,7 @@ class RF69: public PhysicalLayer {
     bool fifoAdd(uint8_t* data, int totalLen, int* remLen);
 
     /*!
-      \brief Set interrupt service routine function to call when FIFO is sufficently full to read.
+      \brief Set interrupt service routine function to call when FIFO is sufficiently full to read.
       \param data Pointer to a buffer that stores the receive data.
       \param totalLen Total number of bytes to receive.
       \param rcvLen Pointer to a counter holding the number of bytes that have been received so far.
@@ -690,9 +712,10 @@ class RF69: public PhysicalLayer {
     int16_t startReceive(uint32_t timeout, uint16_t irqFlags, uint16_t irqMask, size_t len);
 
     /*!
-      \brief Reads data received after calling startReceive method.
+      \brief Reads data received after calling startReceive method. When the packet length is not known in advance,
+      getPacketLength method must be called BEFORE calling readData!
       \param data Pointer to array to save the received binary data.
-      \param len Number of bytes that will be read. When set to 0, the packet length will be retreived automatically.
+      \param len Number of bytes that will be read. When set to 0, the packet length will be retrieved automatically.
       When more bytes than received are requested, only the number of bytes requested will be returned.
       \returns \ref status_codes
     */
@@ -952,7 +975,7 @@ class RF69: public PhysicalLayer {
 
     #if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
     /*!
-      \brief Set interrupt service routine function to call when data bit is receveid in direct mode.
+      \brief Set interrupt service routine function to call when data bit is received in direct mode.
       \param func Pointer to interrupt service routine.
     */
     void setDirectAction(void (*func)(void));

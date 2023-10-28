@@ -10,14 +10,14 @@ Module* SX127x::getMod() {
   return(this->mod);
 }
 
-int16_t SX127x::begin(uint8_t chipVersion, uint8_t syncWord, uint16_t preambleLength) {
+int16_t SX127x::begin(uint8_t* chipVersions, uint8_t numVersions, uint8_t syncWord, uint16_t preambleLength) {
   // set module properties
   this->mod->init();
   this->mod->hal->pinMode(this->mod->getIrq(), this->mod->hal->GpioModeInput);
   this->mod->hal->pinMode(this->mod->getGpio(), this->mod->hal->GpioModeInput);
 
   // try to find the SX127x chip
-  if(!SX127x::findChip(chipVersion)) {
+  if(!SX127x::findChip(chipVersions, numVersions)) {
     RADIOLIB_DEBUG_PRINTLN("No SX127x found!");
     this->mod->term();
     return(RADIOLIB_ERR_CHIP_NOT_FOUND);
@@ -51,20 +51,24 @@ int16_t SX127x::begin(uint8_t chipVersion, uint8_t syncWord, uint16_t preambleLe
   state = SX127x::setPreambleLength(preambleLength);
   RADIOLIB_ASSERT(state);
 
+  // disable IQ inversion
+  state = SX127x::invertIQ(false);
+  RADIOLIB_ASSERT(state);
+
   // initialize internal variables
   this->dataRate = 0.0;
 
   return(state);
 }
 
-int16_t SX127x::beginFSK(uint8_t chipVersion, float freqDev, float rxBw, uint16_t preambleLength, bool enableOOK) {
+int16_t SX127x::beginFSK(uint8_t* chipVersions, uint8_t numVersions, float freqDev, float rxBw, uint16_t preambleLength, bool enableOOK) {
   // set module properties
   this->mod->init();
   this->mod->hal->pinMode(this->mod->getIrq(), this->mod->hal->GpioModeInput);
   this->mod->hal->pinMode(this->mod->getGpio(), this->mod->hal->GpioModeInput);
 
   // try to find the SX127x chip
-  if(!SX127x::findChip(chipVersion)) {
+  if(!SX127x::findChip(chipVersions, numVersions)) {
     RADIOLIB_DEBUG_PRINTLN("No SX127x found!");
     this->mod->term();
     return(RADIOLIB_ERR_CHIP_NOT_FOUND);
@@ -112,6 +116,10 @@ int16_t SX127x::beginFSK(uint8_t chipVersion, float freqDev, float rxBw, uint16_
 
   // set preamble length
   state = SX127x::setPreambleLength(preambleLength);
+  RADIOLIB_ASSERT(state);
+
+  // set preamble polarity
+  state = invertPreamble(false);
   RADIOLIB_ASSERT(state);
 
   // set default sync word
@@ -366,6 +374,10 @@ int16_t SX127x::packetMode() {
   return(this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_PACKET_CONFIG_2, RADIOLIB_SX127X_DATA_MODE_PACKET, 6, 6));
 }
 
+int16_t SX127x::startReceive() {
+  return(this->startReceive(0, RADIOLIB_SX127X_RXCONTINUOUS));
+}
+
 int16_t SX127x::startReceive(uint8_t len, uint8_t mode) {
   // set mode to standby
   int16_t state = setMode(RADIOLIB_SX127X_STANDBY);
@@ -446,6 +458,30 @@ void SX127x::clearDio1Action() {
     return;
   }
   this->mod->hal->detachInterrupt(this->mod->hal->pinToInterrupt(this->mod->getGpio()));
+}
+
+void SX127x::setPacketReceivedAction(void (*func)(void)) {
+  this->setDio0Action(func, this->mod->hal->GpioInterruptRising);
+}
+
+void SX127x::clearPacketReceivedAction() {
+  this->clearDio0Action();
+}
+
+void SX127x::setPacketSentAction(void (*func)(void)) {
+  this->setDio0Action(func, this->mod->hal->GpioInterruptRising);
+}
+
+void SX127x::clearPacketSentAction() {
+  this->clearDio0Action();
+}
+
+void SX127x::setChannelScanAction(void (*func)(void)) {
+  this->setDio0Action(func, this->mod->hal->GpioInterruptRising);
+}
+
+void SX127x::clearChannelScanAction() {
+  this->clearDio0Action();
 }
 
 void SX127x::setFifoEmptyAction(void (*func)(void)) {
@@ -589,6 +625,11 @@ int16_t SX127x::startTransmit(uint8_t* data, size_t len, uint8_t addr) {
 }
 
 int16_t SX127x::finishTransmit() {
+  // wait for at least 1 bit at the lowest possible bit rate before clearing IRQ flags
+  // not doing this and clearing RADIOLIB_SX127X_FLAG_FIFO_OVERRUN will dump the FIFO,
+  // which can lead to mangling of the last bit (#808)
+  mod->hal->delayMicroseconds(1000000/1200);
+
   // clear interrupt flags
   clearIRQFlags();
 
@@ -672,6 +713,13 @@ int16_t SX127x::startChannelScan() {
   return(state);
 }
 
+int16_t SX127x::getChannelScanResult() {
+  if((this->getIRQFlags() & RADIOLIB_SX127X_CLEAR_IRQ_FLAG_CAD_DETECTED) == RADIOLIB_SX127X_CLEAR_IRQ_FLAG_CAD_DETECTED) {
+    return(RADIOLIB_PREAMBLE_DETECTED);
+  }
+  return(RADIOLIB_CHANNEL_FREE);
+}
+
 int16_t SX127x::setSyncWord(uint8_t syncWord) {
   // check active modem
   if(getActiveModem() != RADIOLIB_SX127X_LORA) {
@@ -709,7 +757,7 @@ int16_t SX127x::setCurrentLimit(uint8_t currentLimit) {
   return(state);
 }
 
-int16_t SX127x::setPreambleLength(uint16_t preambleLength) {
+int16_t SX127x::setPreambleLength(size_t preambleLength) {
   // set mode to standby
   int16_t state = setMode(RADIOLIB_SX127X_STANDBY);
   RADIOLIB_ASSERT(state);
@@ -732,6 +780,25 @@ int16_t SX127x::setPreambleLength(uint16_t preambleLength) {
     uint16_t numBytes = preambleLength / 8;
     state = this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_PREAMBLE_MSB_FSK, (uint8_t)((numBytes >> 8) & 0xFF));
     state |= this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_PREAMBLE_LSB_FSK, (uint8_t)(numBytes & 0xFF));
+    return(state);
+  }
+
+  return(RADIOLIB_ERR_UNKNOWN);
+}
+
+int16_t SX127x::invertPreamble(bool enable) {
+  // set mode to standby
+  int16_t state = setMode(RADIOLIB_SX127X_STANDBY);
+  RADIOLIB_ASSERT(state);
+
+  // check active modem
+  uint8_t modem = getActiveModem();
+  if(modem == RADIOLIB_SX127X_LORA) {
+    return(RADIOLIB_ERR_WRONG_MODEM);
+  } else if(modem == RADIOLIB_SX127X_FSK_OOK) {
+    // set preamble polarity
+    uint8_t polarity = enable ? RADIOLIB_SX127X_PREAMBLE_POLARITY_AA : RADIOLIB_SX127X_PREAMBLE_POLARITY_55;
+    state = this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_SYNC_CONFIG, polarity, 5, 5);
     return(state);
   }
 
@@ -953,27 +1020,43 @@ int16_t SX127x::setAFCAGCTrigger(uint8_t trigger) {
 
 int16_t SX127x::setSyncWord(uint8_t* syncWord, size_t len) {
   // check active modem
-  if(getActiveModem() != RADIOLIB_SX127X_FSK_OOK) {
-    return(RADIOLIB_ERR_WRONG_MODEM);
-  }
+  uint8_t modem = getActiveModem();
+  if(modem == RADIOLIB_SX127X_FSK_OOK) {
 
-  RADIOLIB_CHECK_RANGE(len, 1, 8, RADIOLIB_ERR_INVALID_SYNC_WORD);
+    // disable sync word in case len is 0
+    if(len == 0) {
+      int16_t state = this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_SYNC_CONFIG, RADIOLIB_SX127X_SYNC_OFF, 4, 4);
+      return(state);
+    }
 
-  // sync word must not contain value 0x00
-  for(size_t i = 0; i < len; i++) {
-    if(syncWord[i] == 0x00) {
+    RADIOLIB_CHECK_RANGE(len, 1, 8, RADIOLIB_ERR_INVALID_SYNC_WORD);
+
+    // sync word must not contain value 0x00
+    for(size_t i = 0; i < len; i++) {
+      if(syncWord[i] == 0x00) {
+        return(RADIOLIB_ERR_INVALID_SYNC_WORD);
+      }
+    }
+
+    // enable sync word recognition
+    int16_t state = this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_SYNC_CONFIG, RADIOLIB_SX127X_SYNC_ON, 4, 4);
+    state |= this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_SYNC_CONFIG, len - 1, 2, 0);
+    RADIOLIB_ASSERT(state);
+
+    // set sync word
+    this->mod->SPIwriteRegisterBurst(RADIOLIB_SX127X_REG_SYNC_VALUE_1, syncWord, len);
+    return(RADIOLIB_ERR_NONE);
+  
+  } else if(modem == RADIOLIB_SX127X_LORA) {
+    // with length set to 1 and LoRa modem active, assume it is the LoRa sync word
+    if(len > 1) {
       return(RADIOLIB_ERR_INVALID_SYNC_WORD);
     }
+
+    return(this->setSyncWord(syncWord[0]));
   }
 
-  // enable sync word recognition
-  int16_t state = this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_SYNC_CONFIG, RADIOLIB_SX127X_SYNC_ON, 4, 4);
-  state |= this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_SYNC_CONFIG, len - 1, 2, 0);
-  RADIOLIB_ASSERT(state);
-
-  // set sync word
-  this->mod->SPIwriteRegisterBurst(RADIOLIB_SX127X_REG_SYNC_VALUE_1, syncWord, len);
-  return(RADIOLIB_ERR_NONE);
+  return(RADIOLIB_ERR_WRONG_MODEM);
 }
 
 int16_t SX127x::setNodeAddress(uint8_t nodeAddr) {
@@ -1156,7 +1239,7 @@ uint32_t SX127x::getTimeOnAir(size_t len) {
     // Get number of bits preamble
     float n_pre = (float) ((this->mod->SPIgetRegValue(RADIOLIB_SX127X_REG_PREAMBLE_MSB) << 8) | this->mod->SPIgetRegValue(RADIOLIB_SX127X_REG_PREAMBLE_LSB));
     // Get number of bits payload
-    float n_pay = 8.0 + max(ceil((8.0 * (float) len - 4.0 * (float) this->spreadingFactor + 28.0 + 16.0 * crc - 20.0 * ih) / (4.0 * (float) this->spreadingFactor - 8.0 * de)) * (float) this->codingRate, 0.0);
+    float n_pay = 8.0 + RADIOLIB_MAX(ceil((8.0 * (float) len - 4.0 * (float) this->spreadingFactor + 28.0 + 16.0 * crc - 20.0 * ih) / (4.0 * (float) this->spreadingFactor - 8.0 * de)) * (float) this->codingRate, 0.0);
 
     // Get time-on-air in us
     return ceil(symbolLength * (n_pre + n_pay + 4.25)) * 1000;
@@ -1375,10 +1458,6 @@ int16_t SX127x::configFSK() {
   state |= this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_PACKET_CONFIG_2, RADIOLIB_SX127X_DATA_MODE_PACKET | RADIOLIB_SX127X_IO_HOME_OFF, 6, 5);
   RADIOLIB_ASSERT(state);
 
-  // set preamble polarity
-  state =this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_SYNC_CONFIG, RADIOLIB_SX127X_PREAMBLE_POLARITY_55, 5, 5);
-  RADIOLIB_ASSERT(state);
-
   // set FIFO threshold
   state = this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_FIFO_THRESH, RADIOLIB_SX127X_TX_START_FIFO_NOT_EMPTY, 7, 7);
   state |= this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_FIFO_THRESH, RADIOLIB_SX127X_FIFO_THRESH, 5, 0);
@@ -1420,7 +1499,7 @@ int16_t SX127x::setPacketMode(uint8_t mode, uint8_t len) {
   return(state);
 }
 
-bool SX127x::findChip(uint8_t ver) {
+bool SX127x::findChip(uint8_t* vers, uint8_t num) {
   uint8_t i = 0;
   bool flagFound = false;
   while((i < 10) && !flagFound) {
@@ -1429,13 +1508,19 @@ bool SX127x::findChip(uint8_t ver) {
 
     // check version register
     int16_t version = getChipVersion();
-    if(version == ver) {
-      flagFound = true;
-    } else {
-      RADIOLIB_DEBUG_PRINTLN("SX127x not found! (%d of 10 tries) RADIOLIB_SX127X_REG_VERSION == 0x%04X, expected 0x00%X", i + 1, version, ver);
+    for(uint8_t i = 0; i < num; i++) {
+      if(version == vers[i]) {
+        flagFound = true;
+        break;
+      }
+    }
+
+    if(!flagFound) {
+      RADIOLIB_DEBUG_PRINTLN("SX127x not found! (%d of 10 tries) RADIOLIB_SX127X_REG_VERSION == 0x%04X", i + 1, version);
       this->mod->hal->delay(10);
       i++;
     }
+  
   }
 
   return(flagFound);
@@ -1483,20 +1568,22 @@ void SX127x::clearFIFO(size_t count) {
   }
 }
 
-int16_t SX127x::invertIQ(bool invertIQ) {
+int16_t SX127x::invertIQ(bool enable) {
   // check active modem
   if(getActiveModem() != RADIOLIB_SX127X_LORA) {
     return(RADIOLIB_ERR_WRONG_MODEM);
   }
 
+  // Tx path inversion is swapped, because it seems that setting it according to the datsheet
+  // will actually lead to the wrong inversion. See https://github.com/jgromes/RadioLib/issues/778
   int16_t state;
-  if(invertIQ) {
+  if(enable) {
     state = this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_INVERT_IQ, RADIOLIB_SX127X_INVERT_IQ_RXPATH_ON, 6, 6);
-    state |= this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_INVERT_IQ, RADIOLIB_SX127X_INVERT_IQ_TXPATH_ON, 0, 0);
+    state |= this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_INVERT_IQ, RADIOLIB_SX127X_INVERT_IQ_TXPATH_OFF, 0, 0);
     state |= this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_INVERT_IQ2, RADIOLIB_SX127X_IQ2_ENABLE);
   } else {
     state = this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_INVERT_IQ, RADIOLIB_SX127X_INVERT_IQ_RXPATH_OFF, 6, 6);
-    state |= this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_INVERT_IQ, RADIOLIB_SX127X_INVERT_IQ_TXPATH_OFF, 0, 0);
+    state |= this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_INVERT_IQ, RADIOLIB_SX127X_INVERT_IQ_TXPATH_ON, 0, 0);
     state |= this->mod->SPIsetRegValue(RADIOLIB_SX127X_REG_INVERT_IQ2, RADIOLIB_SX127X_IQ2_DISABLE);
   }
 

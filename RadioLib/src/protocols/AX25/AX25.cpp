@@ -154,23 +154,25 @@ void AX25Frame::setSendSequence(uint8_t seqNumber) {
 AX25Client::AX25Client(PhysicalLayer* phy) {
   phyLayer = phy;
   #if !defined(RADIOLIB_EXCLUDE_AFSK)
-  audioClient = nullptr;
+  bellModem = nullptr;
   #endif
 }
 
 #if !defined(RADIOLIB_EXCLUDE_AFSK)
 AX25Client::AX25Client(AFSKClient* audio) {
   phyLayer = audio->phyLayer;
-  audioClient = audio;
-  afskMark = RADIOLIB_AX25_AFSK_MARK;
-  afskSpace = RADIOLIB_AX25_AFSK_SPACE;
-  afskLen = RADIOLIB_AX25_AFSK_TONE_DURATION;
+  bellModem = new BellClient(audio);
+  bellModem->setModem(Bell202);
 }
 
 int16_t AX25Client::setCorrection(int16_t mark, int16_t space, float length) {
-  afskMark = RADIOLIB_AX25_AFSK_MARK + mark;
-  afskSpace = RADIOLIB_AX25_AFSK_SPACE + space;
-  afskLen = length*(float)RADIOLIB_AX25_AFSK_TONE_DURATION;
+  BellModem_t modem;
+  modem.freqMark = Bell202.freqMark + mark;
+  modem.freqSpace = Bell202.freqSpace + space;
+  modem.freqMarkReply = modem.freqMark;
+  modem.freqSpaceReply = modem.freqSpace;
+  modem.baudRate = length*(float)Bell202.baudRate;
+  bellModem->setModem(modem);
   return(RADIOLIB_ERR_NONE);
 }
 #endif
@@ -192,7 +194,12 @@ int16_t AX25Client::begin(const char* srcCallsign, uint8_t srcSSID, uint8_t preL
   preambleLen = preLen;
 
   // configure for direct mode
-  return(phyLayer->startDirect());
+  #if !defined(RADIOLIB_EXCLUDE_AFSK)
+  if(bellModem != nullptr) {
+    return(phyLayer->startDirect());
+  }
+  #endif
+  return(RADIOLIB_ERR_NONE);
 }
 
 #if defined(RADIOLIB_BUILD_ARDUINO)
@@ -301,11 +308,17 @@ int16_t AX25Client::sendFrame(AX25Frame* frame) {
 
   // flip bit order
   for(size_t i = 0; i < frameBuffLen; i++) {
-    frameBuff[i] = Module::flipBits(frameBuff[i]);
+    frameBuff[i] = Module::reflect(frameBuff[i], 8);
   }
 
-  // calculate FCS
-  uint16_t fcs = getFrameCheckSequence(frameBuff, frameBuffLen);
+  // calculate
+  RadioLibCRCInstance.size = 16;
+  RadioLibCRCInstance.poly = RADIOLIB_CRC_CCITT_POLY;
+  RadioLibCRCInstance.init = RADIOLIB_CRC_CCITT_INIT;
+  RadioLibCRCInstance.out = RADIOLIB_CRC_CCITT_OUT;
+  RadioLibCRCInstance.refIn = false;
+  RadioLibCRCInstance.refOut = false;
+  uint16_t fcs = RadioLibCRCInstance.checksum(frameBuff, frameBuffLen);
   *(frameBuffPtr++) = (uint8_t)((fcs >> 8) & 0xFF);
   *(frameBuffPtr++) = (uint8_t)(fcs & 0xFF);
 
@@ -401,27 +414,15 @@ int16_t AX25Client::sendFrame(AX25Frame* frame) {
   // transmit
   int16_t state = RADIOLIB_ERR_NONE;
   #if !defined(RADIOLIB_EXCLUDE_AFSK)
-  if(audioClient != nullptr) {
-    Module* mod = phyLayer->getMod();
-    phyLayer->transmitDirect();
+  if(bellModem != nullptr) {
+    bellModem->idle();
 
     // iterate over all bytes in the buffer
     for(uint32_t i = 0; i < stuffedFrameBuffLen; i++) {
-
-      // check each bit
-      for(uint16_t mask = 0x80; mask >= 0x01; mask >>= 1) {
-        uint32_t start = mod->hal->micros();
-        if(stuffedFrameBuff[i] & mask) {
-          audioClient->tone(afskMark, false);
-        } else {
-          audioClient->tone(afskSpace, false);
-        }
-        mod->waitForMicroseconds(start, afskLen);
-      }
-
+      bellModem->write(stuffedFrameBuff[i]);
     }
 
-    audioClient->noTone();
+    bellModem->standby();
 
   } else {
   #endif
@@ -444,29 +445,6 @@ void AX25Client::getCallsign(char* buff) {
 
 uint8_t AX25Client::getSSID() {
   return(sourceSSID);
-}
-
-/*
-  CCITT CRC implementation based on https://github.com/kicksat/ax25
-
-  Licensed under Creative Commons Attribution-ShareAlike 4.0 International
-  https://creativecommons.org/licenses/by-sa/4.0/
-*/
-uint16_t AX25Client::getFrameCheckSequence(uint8_t* buff, size_t len) {
-  uint8_t outBit;
-  uint16_t mask;
-  uint16_t shiftReg = CRC_CCITT_INIT;
-
-  for(size_t i = 0; i < len; i++) {
-    for(uint8_t b = 0x80; b > 0x00; b /= 2) {
-      outBit = (shiftReg & 0x01) ? 0x01 : 0x00;
-      shiftReg >>= 1;
-      mask = XOR((buff[i] & b), outBit) ? CRC_CCITT_POLY_REVERSED : 0x0000;
-      shiftReg ^= mask;
-    }
-  }
-
-  return(Module::flipBits16(~shiftReg));
 }
 
 #endif

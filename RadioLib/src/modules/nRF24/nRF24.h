@@ -273,6 +273,33 @@ class nRF24: public PhysicalLayer {
     void setIrqAction(void (*func)(void));
 
     /*!
+      \brief Clears interrupt service routine .
+    */
+    void clearIrqAction();
+
+    /*!
+      \brief Sets interrupt service routine to call when a packet is received.
+      \param func ISR to call.
+    */
+    void setPacketReceivedAction(void (*func)(void));
+
+    /*!
+      \brief Clears interrupt service routine to call when a packet is received.
+    */
+    void clearPacketReceivedAction();
+
+    /*!
+      \brief Sets interrupt service routine to call when a packet is sent.
+      \param func ISR to call.
+    */
+    void setPacketSentAction(void (*func)(void));
+
+    /*!
+      \brief Clears interrupt service routine to call when a packet is sent.
+    */
+    void clearPacketSentAction();
+
+    /*!
       \brief Interrupt-driven binary transmit method. IRQ will be activated when full packet is transmitted.
       Overloads for string-based transmissions are implemented in PhysicalLayer.
       \param data Binary data to be sent.
@@ -305,7 +332,8 @@ class nRF24: public PhysicalLayer {
     int16_t startReceive(uint32_t timeout, uint16_t irqFlags, uint16_t irqMask, size_t len);
 
     /*!
-      \brief Reads data received after calling startReceive method.
+      \brief Reads data received after calling startReceive method. When the packet length is not known in advance,
+      getPacketLength method must be called BEFORE calling readData!
       \param data Pointer to array to save the received binary data.
       \param len Number of bytes that will be received. Must be known in advance for binary transmissions.
       \returns \ref status_codes

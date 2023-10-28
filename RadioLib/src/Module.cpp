@@ -44,6 +44,10 @@ void Module::init() {
   this->hal->init();
   this->hal->pinMode(csPin, this->hal->GpioModeOutput);
   this->hal->digitalWrite(csPin, this->hal->GpioLevelHigh);
+  RADIOLIB_DEBUG_PRINTLN("\nRadioLib Debug Info");
+  RADIOLIB_DEBUG_PRINTLN("Version:  %d.%d.%d.%d", RADIOLIB_VERSION_MAJOR, RADIOLIB_VERSION_MINOR, RADIOLIB_VERSION_PATCH, RADIOLIB_VERSION_EXTRA);
+  RADIOLIB_DEBUG_PRINTLN("Platform: " RADIOLIB_PLATFORM);
+  RADIOLIB_DEBUG_PRINTLN("Compiled: " __DATE__ " " __TIME__ "\n");
 }
 
 void Module::term() {
@@ -88,10 +92,10 @@ int16_t Module::SPIsetRegValue(uint16_t reg, uint8_t value, uint8_t msb, uint8_t
     RADIOLIB_DEBUG_PRINTLN();
     RADIOLIB_DEBUG_PRINTLN("address:\t0x%X", reg);
     RADIOLIB_DEBUG_PRINTLN("bits:\t\t%d %d", msb, lsb);
-    RADIOLIB_DEBUG_PRINT("value:\t\t0x%X", value);
-    RADIOLIB_DEBUG_PRINT("current:\t0x%X", currentValue);
-    RADIOLIB_DEBUG_PRINT("mask:\t\t0x%X", mask);
-    RADIOLIB_DEBUG_PRINT("new:\t\t0x%X", newValue);
+    RADIOLIB_DEBUG_PRINTLN("value:\t\t0x%X", value);
+    RADIOLIB_DEBUG_PRINTLN("current:\t0x%X", currentValue);
+    RADIOLIB_DEBUG_PRINTLN("mask:\t\t0x%X", mask);
+    RADIOLIB_DEBUG_PRINTLN("new:\t\t0x%X", newValue);
     RADIOLIB_DEBUG_PRINTLN("read:\t\t0x%X", readValue);
 
     return(RADIOLIB_ERR_SPI_WRITE_FAILED);
@@ -139,52 +143,64 @@ void Module::SPIwriteRegister(uint16_t reg, uint8_t data) {
 }
 
 void Module::SPItransfer(uint8_t cmd, uint16_t reg, uint8_t* dataOut, uint8_t* dataIn, size_t numBytes) {
-  // start SPI transaction
-  this->hal->spiBeginTransaction();
+  // prepare the buffers
+  size_t buffLen = this->SPIaddrWidth/8 + numBytes;
+  #if defined(RADIOLIB_STATIC_ONLY)
+    uint8_t buffOut[RADIOLIB_STATIC_ARRAY_SIZE];
+    uint8_t buffIn[RADIOLIB_STATIC_ARRAY_SIZE];
+  #else
+    uint8_t* buffOut = new uint8_t[buffLen];
+    uint8_t* buffIn = new uint8_t[buffLen];
+  #endif
+  uint8_t* buffOutPtr = buffOut;
 
-  // pull CS low
-  this->hal->digitalWrite(this->csPin, this->hal->GpioLevelLow);
-
-  // send SPI register address with access command
+  // copy the command
   if(this->SPIaddrWidth <= 8) {
-    this->hal->spiTransfer(reg | cmd);
+    *(buffOutPtr++) = reg | cmd;
   } else {
-    this->hal->spiTransfer((reg >> 8) | cmd);
-    this->hal->spiTransfer(reg & 0xFF);
+    *(buffOutPtr++) = (reg >> 8) | cmd;
+    *(buffOutPtr++) = reg & 0xFF;
   }
 
+  // copy the data
+  if(cmd == SPIwriteCommand) {
+    memcpy(buffOutPtr, dataOut, numBytes);
+  } else {
+    memset(buffOutPtr, this->SPInopCommand, numBytes);
+  }
+
+  // do the transfer
+  this->hal->spiBeginTransaction();
+  this->hal->digitalWrite(this->csPin, this->hal->GpioLevelLow);
+  this->hal->spiTransfer(buffOut, buffLen, buffIn);
+  this->hal->digitalWrite(this->csPin, this->hal->GpioLevelHigh);
+  this->hal->spiEndTransaction();
+  
+  // copy the data
+  if(cmd == SPIreadCommand) {
+    memcpy(dataIn, &buffIn[this->SPIaddrWidth/8], numBytes);
+  }
+
+  // print debug information
   #if defined(RADIOLIB_VERBOSE)
+    uint8_t* debugBuffPtr = NULL;
     if(cmd == SPIwriteCommand) {
-      RADIOLIB_VERBOSE_PRINT("W");
+      RADIOLIB_VERBOSE_PRINT("W\t%X\t", reg);
+      debugBuffPtr = &buffOut[this->SPIaddrWidth/8];
     } else if(cmd == SPIreadCommand) {
-      RADIOLIB_VERBOSE_PRINT("R");
+      RADIOLIB_VERBOSE_PRINT("R\t%X\t", reg);
+      debugBuffPtr = &buffIn[this->SPIaddrWidth/8];
     }
-    RADIOLIB_VERBOSE_PRINT("\t%X\t", reg);
+    for(size_t n = 0; n < numBytes; n++) {
+      RADIOLIB_VERBOSE_PRINT("%X\t", debugBuffPtr[n]);
+    }
+    RADIOLIB_VERBOSE_PRINTLN();
   #endif
 
-  // send data or get response
-  if(cmd == SPIwriteCommand) {
-    if(dataOut != NULL) {
-      for(size_t n = 0; n < numBytes; n++) {
-        this->hal->spiTransfer(dataOut[n]);
-        RADIOLIB_VERBOSE_PRINT("%X\t", dataOut[n]);
-      }
-    }
-  } else if (cmd == SPIreadCommand) {
-    if(dataIn != NULL) {
-      for(size_t n = 0; n < numBytes; n++) {
-        dataIn[n] = this->hal->spiTransfer(0x00);
-        RADIOLIB_VERBOSE_PRINT("%X\t", dataIn[n]);
-      }
-    }
-  }
-  RADIOLIB_VERBOSE_PRINTLN();
-
-  // release CS
-  this->hal->digitalWrite(this->csPin, this->hal->GpioLevelHigh);
-
-  // end SPI transaction
-  this->hal->spiEndTransaction();
+  #if !defined(RADIOLIB_STATIC_ONLY)
+    delete[] buffOut;
+    delete[] buffIn;
+  #endif
 }
 
 int16_t Module::SPIreadStream(uint8_t cmd, uint8_t* data, size_t numBytes, bool waitForGpio, bool verify) {
@@ -228,7 +244,7 @@ int16_t Module::SPIcheckStream() {
   // get the status
   uint8_t spiStatus = 0;
   uint8_t cmd = this->SPIstatusCommand;
-  state = this->SPItransferStream(&cmd, 1, false, NULL, &spiStatus, 1, true, RADIOLIB_MODULE_SPI_TIMEOUT);
+  state = this->SPItransferStream(&cmd, 1, false, NULL, &spiStatus, 0, true, RADIOLIB_MODULE_SPI_TIMEOUT);
   RADIOLIB_ASSERT(state);
 
   // translate to RadioLib status code
@@ -241,115 +257,121 @@ int16_t Module::SPIcheckStream() {
 }
 
 int16_t Module::SPItransferStream(uint8_t* cmd, uint8_t cmdLen, bool write, uint8_t* dataOut, uint8_t* dataIn, size_t numBytes, bool waitForGpio, uint32_t timeout) {
-  #if defined(RADIOLIB_VERBOSE)
-    uint8_t debugBuff[RADIOLIB_STATIC_ARRAY_SIZE];
+  // prepare the buffers
+  size_t buffLen = cmdLen + numBytes;
+  if(!write) {
+    buffLen++;
+  }
+  #if defined(RADIOLIB_STATIC_ONLY)
+    uint8_t buffOut[RADIOLIB_STATIC_ARRAY_SIZE];
+    uint8_t buffIn[RADIOLIB_STATIC_ARRAY_SIZE];
+  #else
+    uint8_t* buffOut = new uint8_t[buffLen];
+    uint8_t* buffIn = new uint8_t[buffLen];
   #endif
+  uint8_t* buffOutPtr = buffOut;
+
+  // copy the command
+  for(uint8_t n = 0; n < cmdLen; n++) {
+    *(buffOutPtr++) = cmd[n];
+  }
+
+  // copy the data
+  if(write) {
+    memcpy(buffOutPtr, dataOut, numBytes);
+  } else {
+    memset(buffOutPtr, this->SPInopCommand, numBytes + 1);
+  }
 
   // ensure GPIO is low
-  uint32_t start = this->hal->millis();
-  while(this->hal->digitalRead(this->gpioPin)) {
-    this->hal->yield();
-    if(this->hal->millis() - start >= timeout) {
-      this->hal->digitalWrite(this->csPin, this->hal->GpioLevelLow);
-      RADIOLIB_DEBUG_PRINTLN("Timed out waiting for GPIO pin, is it connected?");
-      return(RADIOLIB_ERR_SPI_CMD_TIMEOUT);
-    }
-  }
-
-  // pull NSS low
-  this->hal->digitalWrite(this->csPin, this->hal->GpioLevelLow);
-
-  // start transfer
-  this->hal->spiBeginTransaction();
-
-  // send command byte(s)
-  for(uint8_t n = 0; n < cmdLen; n++) {
-    this->hal->spiTransfer(cmd[n]);
-  }
-
-  // variable to save error during SPI transfer
-  int16_t state = RADIOLIB_ERR_NONE;
-
-  // send/receive all bytes
-  if(write) {
-    for(size_t n = 0; n < numBytes; n++) {
-      // send byte
-      uint8_t in = this->hal->spiTransfer(dataOut[n]);
-      #if defined(RADIOLIB_VERBOSE)
-        debugBuff[n] = in;
-      #endif
-
-      // check status
-      if(this->SPIparseStatusCb != nullptr) {
-        state = this->SPIparseStatusCb(in);
-      }
-    }
-
+  if(this->gpioPin == RADIOLIB_NC) {
+    this->hal->delay(1);
   } else {
-    // skip the first byte for read-type commands (status-only)
-    uint8_t in = this->hal->spiTransfer(this->SPInopCommand);
-    #if defined(RADIOLIB_VERBOSE)
-      debugBuff[0] = in;
-    #endif
-
-    // check status
-    if(this->SPIparseStatusCb != nullptr) {
-      state = this->SPIparseStatusCb(in);
-    } else {
-      state = RADIOLIB_ERR_NONE;
-    }
-
-    // read the data
-    if(state == RADIOLIB_ERR_NONE) {
-      for(size_t n = 0; n < numBytes; n++) {
-        dataIn[n] = this->hal->spiTransfer(this->SPInopCommand);
-      }
-    }
-  }
-
-  // stop transfer
-  this->hal->spiEndTransaction();
-  this->hal->digitalWrite(this->csPin, this->hal->GpioLevelHigh);
-
-  // wait for GPIO to go high and then low
-  if(waitForGpio) {
-    this->hal->delayMicroseconds(1);
     uint32_t start = this->hal->millis();
     while(this->hal->digitalRead(this->gpioPin)) {
       this->hal->yield();
       if(this->hal->millis() - start >= timeout) {
-        state = RADIOLIB_ERR_SPI_CMD_TIMEOUT;
-        break;
+        RADIOLIB_DEBUG_PRINTLN("GPIO pre-transfer timeout, is it connected?");
+        #if !defined(RADIOLIB_STATIC_ONLY)
+          delete[] buffOut;
+          delete[] buffIn;
+        #endif
+        return(RADIOLIB_ERR_SPI_CMD_TIMEOUT);
       }
     }
   }
 
-  // print debug output
+  // do the transfer
+  this->hal->spiBeginTransaction();
+  this->hal->digitalWrite(this->csPin, this->hal->GpioLevelLow);
+  this->hal->spiTransfer(buffOut, buffLen, buffIn);
+  this->hal->digitalWrite(this->csPin, this->hal->GpioLevelHigh);
+  this->hal->spiEndTransaction();
+
+  // wait for GPIO to go high and then low
+  if(waitForGpio) {
+    if(this->gpioPin == RADIOLIB_NC) {
+      this->hal->delay(1);
+    } else {
+      this->hal->delayMicroseconds(1);
+      uint32_t start = this->hal->millis();
+      while(this->hal->digitalRead(this->gpioPin)) {
+        this->hal->yield();
+        if(this->hal->millis() - start >= timeout) {
+          RADIOLIB_DEBUG_PRINTLN("GPIO post-transfer timeout, is it connected?");
+          #if !defined(RADIOLIB_STATIC_ONLY)
+            delete[] buffOut;
+            delete[] buffIn;
+          #endif
+          return(RADIOLIB_ERR_SPI_CMD_TIMEOUT);
+        }
+      }
+    }
+  }
+
+  // parse status
+  int16_t state = RADIOLIB_ERR_NONE;
+  if((this->SPIparseStatusCb != nullptr) && (numBytes > 0)) {
+    state = this->SPIparseStatusCb(buffIn[cmdLen]);
+  }
+  
+  // copy the data
+  if(!write) {
+    // skip the first byte for read-type commands (status-only)
+    memcpy(dataIn, &buffIn[cmdLen + 1], numBytes);
+  }
+
+  // print debug information
   #if defined(RADIOLIB_VERBOSE)
     // print command byte(s)
-    RADIOLIB_VERBOSE_PRINT("CMD\t");
-    for(uint8_t n = 0; n < cmdLen; n++) {
+    RADIOLIB_VERBOSE_PRINT("CMD");
+    if(write) {
+      RADIOLIB_VERBOSE_PRINT("W\t");
+    } else {
+      RADIOLIB_VERBOSE_PRINT("R\t");
+    }
+    size_t n = 0;
+    for(; n < cmdLen; n++) {
       RADIOLIB_VERBOSE_PRINT("%X\t", cmd[n]);
     }
     RADIOLIB_VERBOSE_PRINTLN();
 
     // print data bytes
-    RADIOLIB_VERBOSE_PRINT("DAT");
-    if(write) {
-      RADIOLIB_VERBOSE_PRINT("W\t");
-      for(size_t n = 0; n < numBytes; n++) {
-        RADIOLIB_VERBOSE_PRINT("%X\t%X\t", dataOut[n], debugBuff[n]);
-      }
-      RADIOLIB_VERBOSE_PRINTLN();
-    } else {
-      RADIOLIB_VERBOSE_PRINT("R\t%X\t%X\t", this->SPInopCommand, debugBuff[0]);
-
-      for(size_t n = 0; n < numBytes; n++) {
-        RADIOLIB_VERBOSE_PRINT("%X\t%X\t", this->SPInopCommand, dataIn[n]);
-      }
-      RADIOLIB_VERBOSE_PRINTLN();
+    RADIOLIB_VERBOSE_PRINT("SI\t");
+    for(; n < buffLen; n++) {
+      RADIOLIB_VERBOSE_PRINT("%X\t", buffOut[n]);
     }
     RADIOLIB_VERBOSE_PRINTLN();
+    RADIOLIB_VERBOSE_PRINT("SO\t");
+    for(n = cmdLen; n < buffLen; n++) {
+      RADIOLIB_VERBOSE_PRINT("%X\t", buffIn[n]);
+    }
+    RADIOLIB_VERBOSE_PRINTLN();
+  #endif
+
+  #if !defined(RADIOLIB_STATIC_ONLY)
+    delete[] buffOut;
+    delete[] buffIn;
   #endif
 
   return(state);
@@ -359,7 +381,7 @@ void Module::waitForMicroseconds(uint32_t start, uint32_t len) {
   #if defined(RADIOLIB_INTERRUPT_TIMING)
   (void)start;
   if((this->TimerSetupCb != nullptr) && (len != this->prevTimingLen)) {
-    _prevTimingLen = len;
+    prevTimingLen = len;
     this->TimerSetupCb(len);
   }
   this->TimerFlag = false;
@@ -373,21 +395,15 @@ void Module::waitForMicroseconds(uint32_t start, uint32_t len) {
   #endif
 }
 
-uint8_t Module::flipBits(uint8_t b) {
-  b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
-  b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
-  b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
-  return b;
+uint32_t Module::reflect(uint32_t in, uint8_t bits) {
+  uint32_t res = 0;
+  for(uint8_t i = 0; i < bits; i++) {
+    res |= (((in & ((uint32_t)1 << i)) >> i) << (bits - i - 1));
+  }
+  return(res);
 }
 
-uint16_t Module::flipBits16(uint16_t i) {
-  i = (i & 0xFF00) >> 8 | (i & 0x00FF) << 8;
-  i = (i & 0xF0F0) >> 4 | (i & 0x0F0F) << 4;
-  i = (i & 0xCCCC) >> 2 | (i & 0x3333) << 2;
-  i = (i & 0xAAAA) >> 1 | (i & 0x5555) << 1;
-  return i;
-}
-
+#if defined(RADIOLIB_DEBUG)
 void Module::hexdump(uint8_t* data, size_t len, uint32_t offset, uint8_t width, bool be) {
   size_t rem_len = len;
   for(size_t i = 0; i < len; i+=16) {
@@ -445,6 +461,7 @@ void Module::regdump(uint16_t start, size_t len) {
     delete[] buff;
   #endif
 }
+#endif
 
 #if defined(RADIOLIB_DEBUG) and defined(RADIOLIB_BUILD_ARDUINO)
 // https://github.com/esp8266/Arduino/blob/65579d29081cb8501e4d7f786747bf12e7b37da2/cores/esp8266/Print.cpp#L50

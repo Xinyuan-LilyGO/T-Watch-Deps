@@ -128,6 +128,10 @@ int16_t PhysicalLayer::standby(uint8_t mode) {
   return(RADIOLIB_ERR_UNSUPPORTED);
 }
 
+int16_t PhysicalLayer::startReceive() {
+  return(RADIOLIB_ERR_UNSUPPORTED);
+}
+
 int16_t PhysicalLayer::startReceive(uint32_t timeout, uint16_t irqFlags, uint16_t irqMask, size_t len) {
   (void)timeout;
   (void)irqFlags;
@@ -242,6 +246,32 @@ int16_t PhysicalLayer::setEncoding(uint8_t encoding) {
   return(RADIOLIB_ERR_UNSUPPORTED);
 }
 
+int16_t PhysicalLayer::invertIQ(bool enable) {
+  (void)enable;
+  return(RADIOLIB_ERR_UNSUPPORTED);
+}
+
+int16_t PhysicalLayer::setOutputPower(int8_t power) {
+  (void)power;
+  return(RADIOLIB_ERR_UNSUPPORTED);
+}
+
+int16_t PhysicalLayer::setSyncWord(uint8_t* sync, size_t len) {
+  (void)sync;
+  (void)len;
+  return(RADIOLIB_ERR_UNSUPPORTED);
+}
+
+int16_t PhysicalLayer::setPreambleLength(size_t len) {
+  (void)len;
+  return(RADIOLIB_ERR_UNSUPPORTED);
+}
+
+int16_t PhysicalLayer::setDataRate(DataRate_t dr) {
+  (void)dr;
+  return(RADIOLIB_ERR_UNSUPPORTED);
+}
+
 float PhysicalLayer::getFreqStep() const {
   return(this->freqStep);
 }
@@ -257,6 +287,23 @@ float PhysicalLayer::getRSSI() {
 
 float PhysicalLayer::getSNR() {
   return(RADIOLIB_ERR_UNSUPPORTED);
+}
+
+uint32_t PhysicalLayer::getTimeOnAir(size_t len) {
+  (void)len;
+  return(0);
+}
+    
+int16_t PhysicalLayer::startChannelScan() {
+  return(RADIOLIB_ERR_UNSUPPORTED); 
+}
+
+int16_t PhysicalLayer::getChannelScanResult() {
+  return(RADIOLIB_ERR_UNSUPPORTED);
+}
+
+int16_t PhysicalLayer::scanChannel() {
+  return(RADIOLIB_ERR_UNSUPPORTED); 
 }
 
 int32_t PhysicalLayer::random(int32_t max) {
@@ -275,7 +322,6 @@ int32_t PhysicalLayer::random(int32_t max) {
   if(randNum < 0) {
     randNum *= -1;
   }
-  RADIOLIB_DEBUG_PRINTLN("%d", randNum);
   return(randNum % max);
 }
 
@@ -347,7 +393,7 @@ void PhysicalLayer::updateDirectBuffer(uint8_t bit) {
     this->syncBuffer <<= 1;
     this->syncBuffer |= bit;
 
-    RADIOLIB_VERBOSE_PRINTLN("S\t%X", this->syncBuffer);
+    RADIOLIB_VERBOSE_PRINTLN("S\t%lu", this->syncBuffer);
 
     if((this->syncBuffer & this->directSyncWordMask) == this->directSyncWord) {
       this->gotSync = true;
@@ -367,7 +413,7 @@ void PhysicalLayer::updateDirectBuffer(uint8_t bit) {
 
     // check complete byte
     if(this->bufferBitPos == 8) {
-      this->buffer[this->bufferWritePos] = Module::flipBits(this->buffer[this->bufferWritePos]);
+      this->buffer[this->bufferWritePos] = Module::reflect(this->buffer[this->bufferWritePos], 8);
       RADIOLIB_VERBOSE_PRINTLN("R\t%X", this->buffer[this->bufferWritePos]);
 
       this->bufferWritePos++;
@@ -392,11 +438,28 @@ int16_t PhysicalLayer::setDIOMapping(uint32_t pin, uint32_t value) {
   return(RADIOLIB_ERR_UNSUPPORTED);
 }
 
-void PhysicalLayer::setDio1Action(void (*func)(void)) {
+void PhysicalLayer::setPacketReceivedAction(void (*func)(void)) {
   (void)func;
 }
 
-void PhysicalLayer::clearDio1Action() {
+void PhysicalLayer::clearPacketReceivedAction() {
+  
+}
+
+void PhysicalLayer::setPacketSentAction(void (*func)(void)) {
+  (void)func;
+}
+
+void PhysicalLayer::clearPacketSentAction() {
+  
+}
+
+void PhysicalLayer::setChannelScanAction(void (*func)(void)) {
+  (void)func;
+}
+
+void PhysicalLayer::clearChannelScanAction() {
+  
 }
 
 #if defined(RADIOLIB_INTERRUPT_TIMING)

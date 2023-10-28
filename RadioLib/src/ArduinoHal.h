@@ -47,9 +47,12 @@ class ArduinoHal : public RadioLibHal {
     long pulseIn(uint32_t pin, uint32_t state, unsigned long timeout) override;
     void spiBegin() override;
     void spiBeginTransaction() override;
-    uint8_t spiTransfer(uint8_t b) override;
+    void spiTransfer(uint8_t* out, size_t len, uint8_t* in) override;
     void spiEndTransaction() override;
     void spiEnd() override;
+
+    void readPersistentStorage(uint32_t addr, uint8_t* buff, size_t len) override;
+    void writePersistentStorage(uint32_t addr, uint8_t* buff, size_t len) override;
 
     // implementations of virtual RadioLibHal methods
     void init() override;
@@ -70,7 +73,7 @@ class ArduinoHal : public RadioLibHal {
     mbed::PwmOut *pwmPin = NULL;
     #endif
 
-    #if defined(ESP32)
+    #if defined(RADIOLIB_ESP32)
     int32_t prev = -1;
     #endif
 };

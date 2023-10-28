@@ -460,7 +460,7 @@ class SX128x: public PhysicalLayer {
     int16_t scanChannel();
 
     /*!
-      \brief Sets the module to sleep mode.
+      \brief Sets the module to sleep mode. To wake the device up, call standby().
       \param retainConfig Set to true to retain configuration and data buffer or to false
       to discard current configuration and data buffer. Defaults to true.
       \returns \ref status_codes
@@ -477,9 +477,10 @@ class SX128x: public PhysicalLayer {
       \brief Sets the module to standby mode.
       \param mode Oscillator to be used in standby mode. Can be set to RADIOLIB_SX128X_STANDBY_RC
       (13 MHz RC oscillator) or RADIOLIB_SX128X_STANDBY_XOSC (52 MHz external crystal oscillator).
+      \param wakeup Whether to force the module to wake up. Setting to true will immediately attempt to wake up the module.
       \returns \ref status_codes
     */
-    int16_t standby(uint8_t mode);
+    int16_t standby(uint8_t mode, bool wakeup = false);
 
     // interrupt methods
 
@@ -493,6 +494,28 @@ class SX128x: public PhysicalLayer {
       \brief Clears interrupt service routine to call when DIO1 activates.
     */
     void clearDio1Action();
+
+    /*!
+      \brief Sets interrupt service routine to call when a packet is received.
+      \param func ISR to call.
+    */
+    void setPacketReceivedAction(void (*func)(void));
+
+    /*!
+      \brief Clears interrupt service routine to call when a packet is received.
+    */
+    void clearPacketReceivedAction();
+
+    /*!
+      \brief Sets interrupt service routine to call when a packet is sent.
+      \param func ISR to call.
+    */
+    void setPacketSentAction(void (*func)(void));
+
+    /*!
+      \brief Clears interrupt service routine to call when a packet is sent.
+    */
+    void clearPacketSentAction();
 
     /*!
       \brief Interrupt-driven binary transmit method.
@@ -509,6 +532,14 @@ class SX128x: public PhysicalLayer {
       \returns \ref status_codes
     */
     int16_t finishTransmit() override;
+    
+    /*!
+      \brief Interrupt-driven receive method with default parameters.
+      Implemented for compatibility with PhysicalLayer.
+
+      \returns \ref status_codes
+    */
+    int16_t startReceive();
 
     /*!
       \brief Interrupt-driven receive method. DIO1 will be activated when full packet is received.
@@ -522,7 +553,7 @@ class SX128x: public PhysicalLayer {
       \param len Only for PhysicalLayer compatibility, not used.
       \returns \ref status_codes
     */
-    int16_t startReceive(uint16_t timeout = RADIOLIB_SX128X_RX_TIMEOUT_INF, uint16_t irqFlags = RADIOLIB_SX128X_IRQ_RX_DEFAULT, uint16_t irqMask = RADIOLIB_SX128X_IRQ_RX_DONE, size_t len = 0);
+    int16_t startReceive(uint16_t timeout, uint16_t irqFlags = RADIOLIB_SX128X_IRQ_RX_DEFAULT, uint16_t irqMask = RADIOLIB_SX128X_IRQ_RX_DONE, size_t len = 0);
 
     /*!
       \brief Reads the current IRQ status.
@@ -531,9 +562,10 @@ class SX128x: public PhysicalLayer {
     uint16_t getIrqStatus();
 
     /*!
-      \brief Reads data received after calling startReceive method.
+      \brief Reads data received after calling startReceive method. When the packet length is not known in advance,
+      getPacketLength method must be called BEFORE calling readData!
       \param data Pointer to array to save the received binary data.
-      \param len Number of bytes that will be read. When set to 0, the packet length will be retreived automatically.
+      \param len Number of bytes that will be read. When set to 0, the packet length will be retrieved automatically.
       When more bytes than received are requested, only the number of bytes requested will be returned.
       \returns \ref status_codes
     */

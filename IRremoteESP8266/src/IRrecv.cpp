@@ -943,8 +943,21 @@ bool IRrecv::decode(decode_results *results, irparams_t *save,
       return true;
 #endif
 #if DECODE_ARGO
-    DPRINTLN("Attempting Argo decode");
-    if (decodeArgo(results, offset)) return true;
+  DPRINTLN("Attempting Argo WREM3 decode (AC Control)");
+  if (decodeArgoWREM3(results, offset, kArgo3AcControlStateLength * 8, true))
+    return true;
+  DPRINTLN("Attempting Argo WREM3 decode (iFeel report)");
+  if (decodeArgoWREM3(results, offset, kArgo3iFeelReportStateLength * 8, true))
+    return true;
+  DPRINTLN("Attempting Argo WREM3 decode (Config)");
+  if (decodeArgoWREM3(results, offset, kArgo3ConfigStateLength * 8, true))
+    return true;
+  DPRINTLN("Attempting Argo WREM3 decode (Timer)");
+  if (decodeArgoWREM3(results, offset, kArgo3TimerStateLength * 8, true))
+    return true;
+  DPRINTLN("Attempting Argo WREM2 decode");
+    if (decodeArgo(results, offset, kArgoBits) ||
+        decodeArgo(results, offset, kArgoShortBits, false)) return true;
 #endif  // DECODE_ARGO
 #if DECODE_SHARP_AC
     DPRINTLN("Attempting SHARP_AC decode");
@@ -1152,6 +1165,18 @@ bool IRrecv::decode(decode_results *results, irparams_t *save,
     DPRINTLN("Attempting Daikin 312-bit decode");
     if (decodeDaikin312(results, offset)) return true;
 #endif  // DECODE_DAIKIN312
+#if DECODE_GORENJE
+    DPRINTLN("Attempting GORENJE decode");
+    if (decodeGorenje(results, offset)) return true;
+#endif  // DECODE_GORENJE
+#if DECODE_WOWWEE
+    DPRINTLN("Attempting WOWWEE decode");
+    if (decodeWowwee(results, offset)) return true;
+#endif  // DECODE_WOWWEE
+#if DECODE_CARRIER_AC84
+    DPRINTLN("Attempting Carrier A/C 84-bit decode");
+    if (decodeCarrierAC84(results, offset)) return true;
+#endif  // DECODE_CARRIER_AC84
   // Typically new protocols are added above this line.
   }
 #if DECODE_HASH

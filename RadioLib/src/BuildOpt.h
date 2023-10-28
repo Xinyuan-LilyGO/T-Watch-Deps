@@ -68,7 +68,6 @@
   //#define RADIOLIB_EXCLUDE_SI443X
   //#define RADIOLIB_EXCLUDE_RFM2X      // dependent on RADIOLIB_EXCLUDE_SI443X
   //#define RADIOLIB_EXCLUDE_SX127X
-  //#define RADIOLIB_EXCLUDE_RFM9X      // dependent on RADIOLIB_EXCLUDE_SX127X
   //#define RADIOLIB_EXCLUDE_SX126X
   //#define RADIOLIB_EXCLUDE_STM32WLX   // dependent on RADIOLIB_EXCLUDE_SX126X
   //#define RADIOLIB_EXCLUDE_SX128X
@@ -88,7 +87,9 @@
   // ESP8266 boards
   #define RADIOLIB_PLATFORM                           "ESP8266"
 
-#elif defined(ESP32)
+#elif defined(ESP32) || defined(ARDUINO_ARCH_ESP32)
+  #define RADIOLIB_ESP32
+
   // ESP32 boards
   #define RADIOLIB_PLATFORM                           "ESP32"
   
@@ -103,6 +104,7 @@
 #elif defined(SAMD_SERIES)
   // Adafruit SAMD boards (M0 and M4)
   #define RADIOLIB_PLATFORM                           "Adafruit SAMD"
+  #define RADIOLIB_EEPROM_UNSUPPORTED
 
 #elif defined(ARDUINO_ARCH_SAMD)
   // Arduino SAMD (Zero, MKR, etc.)
@@ -110,15 +112,18 @@
   #define RADIOLIB_ARDUINOHAL_PIN_MODE_CAST           (PinMode)
   #define RADIOLIB_ARDUINOHAL_PIN_STATUS_CAST         (PinStatus)
   #define RADIOLIB_ARDUINOHAL_INTERRUPT_MODE_CAST     (PinStatus)  
+  #define RADIOLIB_EEPROM_UNSUPPORTED
 
 #elif defined(__SAM3X8E__)
   // Arduino Due
   #define RADIOLIB_PLATFORM                           "Arduino Due"
   #define RADIOLIB_TONE_UNSUPPORTED
+  #define RADIOLIB_EEPROM_UNSUPPORTED
 
 #elif (defined(NRF52832_XXAA) || defined(NRF52840_XXAA)) && !defined(ARDUINO_ARDUINO_NANO33BLE)
   // Adafruit nRF52 boards
   #define RADIOLIB_PLATFORM                           "Adafruit nRF52"
+  #define RADIOLIB_EEPROM_UNSUPPORTED
 
 #elif defined(ARDUINO_ARC32_TOOLS)
   // Intel Curie
@@ -141,6 +146,7 @@
   #define RADIOLIB_ARDUINOHAL_PIN_MODE_CAST           (PinMode)
   #define RADIOLIB_ARDUINOHAL_PIN_STATUS_CAST         (PinStatus)
   #define RADIOLIB_ARDUINOHAL_INTERRUPT_MODE_CAST     (PinStatus)
+  #define RADIOLIB_EEPROM_UNSUPPORTED
 
   // Arduino mbed OS boards have a really bad tone implementation which will crash after a couple seconds
   #define RADIOLIB_TONE_UNSUPPORTED
@@ -152,6 +158,7 @@
   #define RADIOLIB_ARDUINOHAL_PIN_MODE_CAST           (PinMode)
   #define RADIOLIB_ARDUINOHAL_PIN_STATUS_CAST         (PinStatus)
   #define RADIOLIB_ARDUINOHAL_INTERRUPT_MODE_CAST     (PinStatus)
+  #define RADIOLIB_EEPROM_UNSUPPORTED
 
   // Arduino mbed OS boards have a really bad tone implementation which will crash after a couple seconds
   #define RADIOLIB_TONE_UNSUPPORTED
@@ -173,6 +180,7 @@
   #define RADIOLIB_ARDUINOHAL_PIN_MODE_CAST           (PinMode)
   #define RADIOLIB_ARDUINOHAL_PIN_STATUS_CAST         (PinStatus)
   #define RADIOLIB_ARDUINOHAL_INTERRUPT_MODE_CAST     (PinStatus)
+  #define RADIOLIB_EEPROM_UNSUPPORTED
 
   // Arduino mbed OS boards have a really bad tone implementation which will crash after a couple seconds
   #define RADIOLIB_TONE_UNSUPPORTED
@@ -242,6 +250,13 @@
   // Teensy
   #define RADIOLIB_PLATFORM                           "Teensy"
 
+#elif defined(ARDUINO_ARCH_RENESAS)
+  // Arduino Renesas (UNO R4)
+  #define RADIOLIB_PLATFORM                           "Arduino Renesas (UNO R4)"
+  #define RADIOLIB_ARDUINOHAL_PIN_MODE_CAST           (PinMode)
+  #define RADIOLIB_ARDUINOHAL_PIN_STATUS_CAST         (PinStatus)
+  #define RADIOLIB_ARDUINOHAL_INTERRUPT_MODE_CAST     (PinStatus)
+
 #else
   // other Arduino platforms not covered by the above list - this may or may not work
   #define RADIOLIB_PLATFORM                           "Unknown Arduino"
@@ -265,6 +280,10 @@
 
   #if !defined(RADIOLIB_NONVOLATILE)
     #define RADIOLIB_NONVOLATILE                        PROGMEM
+  #endif
+
+  #if !defined(RADIOLIB_NONVOLATILE_PTR)
+    #define RADIOLIB_NONVOLATILE_PTR                    PGM_P
   #endif
 
   #if !defined(RADIOLIB_NONVOLATILE_READ_BYTE)
@@ -310,11 +329,8 @@
   #define OCT 8
   #define BIN 2
 
-  #include <algorithm>
   #include <stdint.h>
 
-  using std::max;
-  using std::min;
 #endif
 
 /*
@@ -340,7 +356,7 @@
 /*
  * Uncomment to enable "paranoid" SPI mode
  * Every write to an SPI register using SPI set function will be verified by a subsequent read operation.
- * This improves reliablility, but slightly slows down communication.
+ * This improves reliability, but slightly slows down communication.
  * Note: Enabled by default.
  */
 #if !defined(RADIOLIB_SPI_PARANOID)
@@ -414,6 +430,21 @@
   #define RADIOLIB_STATIC_ARRAY_SIZE   (256)
 #endif
 
+// the base address for persistent storage
+// some protocols (e.g. LoRaWAN) require a method
+// to store some data persistently
+// on Arduino, this will use EEPROM, on non-Arduino platform,
+// it will use anything provided by the hardware abstraction layer
+// RadioLib will place these starting at this address
+#if !defined(RADIOLIB_HAL_PERSISTENT_STORAGE_BASE)
+  #define RADIOLIB_HAL_PERSISTENT_STORAGE_BASE            (0)
+#endif
+
+// the amount of space allocated to the persistent storage
+#if !defined(RADIOLIB_HAL_PERSISTENT_STORAGE_SIZE)
+  #define RADIOLIB_HAL_PERSISTENT_STORAGE_SIZE            (0xD0)
+#endif
+
 // This only compiles on STM32 boards with SUBGHZ module, but also
 // include when generating docs
 #if (!defined(ARDUINO_ARCH_STM32) || !defined(SUBGHZSPI_BASE)) && !defined(DOXYGEN)
@@ -424,6 +455,9 @@
   #if defined(RADIOLIB_BUILD_ARDUINO)
     #define RADIOLIB_DEBUG_PRINT(...) Module::serialPrintf(__VA_ARGS__)
     #define RADIOLIB_DEBUG_PRINTLN(M, ...) Module::serialPrintf(M "\n", ##__VA_ARGS__)
+
+    // some platforms do not support printf("%f"), so it has to be done this way
+    #define RADIOLIB_DEBUG_PRINT_FLOAT(VAL, DECIMALS) RADIOLIB_DEBUG_PORT.print(VAL, DECIMALS)
   #else
     #if !defined(RADIOLIB_DEBUG_PRINT)
       #define RADIOLIB_DEBUG_PRINT(...) fprintf(RADIOLIB_DEBUG_PORT, __VA_ARGS__)
@@ -431,10 +465,14 @@
     #if !defined(RADIOLIB_DEBUG_PRINTLN)
       #define RADIOLIB_DEBUG_PRINTLN(M, ...) fprintf(RADIOLIB_DEBUG_PORT, M "\n", ##__VA_ARGS__)
     #endif
+    #define RADIOLIB_DEBUG_PRINT_FLOAT(VAL, DECIMALS) RADIOLIB_DEBUG_PRINT("%.3f", VAL)
   #endif
+  #define RADIOLIB_DEBUG_HEXDUMP(...) Module::hexdump(__VA_ARGS__)
 #else
   #define RADIOLIB_DEBUG_PRINT(...) {}
   #define RADIOLIB_DEBUG_PRINTLN(...) {}
+  #define RADIOLIB_DEBUG_PRINT_FLOAT(VAL, DECIMALS) {}
+  #define RADIOLIB_DEBUG_HEXDUMP(...) {}
 #endif
 
 #if defined(RADIOLIB_VERBOSE)
@@ -449,7 +487,6 @@
   \brief A simple assert macro, will return on error.
 */
 #define RADIOLIB_ASSERT(STATEVAR) { if((STATEVAR) != RADIOLIB_ERR_NONE) { return(STATEVAR); } }
-
 
 /*!
   \brief Macro to check variable is within constraints - this is commonly used to check parameter ranges. Requires RADIOLIB_CHECK_RANGE to be enabled
@@ -466,9 +503,14 @@
   #define RADIOLIB_ERRATA_SX127X(...) {}
 #endif
 
+// these macros are usually defined by Arduino, but some platforms undef them, so its safer to use our own
+#define RADIOLIB_MIN(a,b)				((a)<(b)?(a):(b))
+#define RADIOLIB_MAX(a,b)				((a)>(b)?(a):(b))
+#define RADIOLIB_ABS(x)         ((x)>0?(x):-(x))
+
 // version definitions
 #define RADIOLIB_VERSION_MAJOR  (0x06)
-#define RADIOLIB_VERSION_MINOR  (0x00)
+#define RADIOLIB_VERSION_MINOR  (0x02)
 #define RADIOLIB_VERSION_PATCH  (0x00)
 #define RADIOLIB_VERSION_EXTRA  (0x00)
 
