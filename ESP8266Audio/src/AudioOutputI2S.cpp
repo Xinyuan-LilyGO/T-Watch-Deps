@@ -20,6 +20,9 @@
 
 #include <Arduino.h>
 #ifdef ESP32
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)
+  #include "esp_chip_info.h"
+#endif
   #include "driver/i2s.h"
 #elif defined(ARDUINO_ARCH_RP2040) || ARDUINO_ESP8266_MAJOR >= 3
   #include <I2S.h>
