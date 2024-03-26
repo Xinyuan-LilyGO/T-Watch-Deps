@@ -3,7 +3,7 @@
 
 #include "../../TypeDef.h"
 
-#if !defined(RADIOLIB_EXCLUDE_SX127X)
+#if !RADIOLIB_EXCLUDE_SX127X
 
 #include "../../Module.h"
 
@@ -160,6 +160,7 @@
 #define RADIOLIB_SX127X_MASK_IRQ_FLAG_CAD_DONE                  0b11111011  //  2     2   CAD complete
 #define RADIOLIB_SX127X_MASK_IRQ_FLAG_FHSS_CHANGE_CHANNEL       0b11111101  //  1     1   FHSS change channel
 #define RADIOLIB_SX127X_MASK_IRQ_FLAG_CAD_DETECTED              0b11111110  //  0     0   valid LoRa signal detected during CAD operation
+#define RADIOLIB_SX127X_MASK_IRQ_FLAG_RX_DEFAULT                0b00011111  //  7     0   default for Rx (RX_TIMEOUT, RX_DONE, CRC_ERR)
 
 // RADIOLIB_SX127X_REG_FIFO_TX_BASE_ADDR
 #define RADIOLIB_SX127X_FIFO_TX_BASE_ADDR_MAX                   0b00000000  //  7     0   allocate the entire FIFO buffer for TX only
@@ -471,14 +472,14 @@
 // RADIOLIB_SX127X_REG_LOW_BAT
 #define RADIOLIB_SX127X_LOW_BAT_OFF                             0b00000000  //  3     3   low battery detector disabled
 #define RADIOLIB_SX127X_LOW_BAT_ON                              0b00001000  //  3     3   low battery detector enabled
-#define RADIOLIB_SX127X_LOW_BAT_TRIM_1_695_V                    0b00000000  //  2     0   battery voltage threshold: 1.695 V
-#define RADIOLIB_SX127X_LOW_BAT_TRIM_1_764_V                    0b00000001  //  2     0                              1.764 V
-#define RADIOLIB_SX127X_LOW_BAT_TRIM_1_835_V                    0b00000010  //  2     0                              1.835 V (default)
-#define RADIOLIB_SX127X_LOW_BAT_TRIM_1_905_V                    0b00000011  //  2     0                              1.905 V
-#define RADIOLIB_SX127X_LOW_BAT_TRIM_1_976_V                    0b00000100  //  2     0                              1.976 V
-#define RADIOLIB_SX127X_LOW_BAT_TRIM_2_045_V                    0b00000101  //  2     0                              2.045 V
-#define RADIOLIB_SX127X_LOW_BAT_TRIM_2_116_V                    0b00000110  //  2     0                              2.116 V
-#define RADIOLIB_SX127X_LOW_BAT_TRIM_2_185_V                    0b00000111  //  2     0                              2.185 V
+#define RADIOLIB_SX127X_LOW_BAT_THRESHOLD_1_695_V               0b00000000  //  2     0   battery voltage threshold: 1.695 V
+#define RADIOLIB_SX127X_LOW_BAT_THRESHOLD_1_764_V               0b00000001  //  2     0                              1.764 V
+#define RADIOLIB_SX127X_LOW_BAT_THRESHOLD_1_835_V               0b00000010  //  2     0                              1.835 V (default)
+#define RADIOLIB_SX127X_LOW_BAT_THRESHOLD_1_905_V               0b00000011  //  2     0                              1.905 V
+#define RADIOLIB_SX127X_LOW_BAT_THRESHOLD_1_976_V               0b00000100  //  2     0                              1.976 V
+#define RADIOLIB_SX127X_LOW_BAT_THRESHOLD_2_045_V               0b00000101  //  2     0                              2.045 V
+#define RADIOLIB_SX127X_LOW_BAT_THRESHOLD_2_116_V               0b00000110  //  2     0                              2.116 V
+#define RADIOLIB_SX127X_LOW_BAT_THRESHOLD_2_185_V               0b00000111  //  2     0                              2.185 V
 
 // RADIOLIB_SX127X_REG_IRQ_FLAGS_1
 #define RADIOLIB_SX127X_FLAG_MODE_READY                         0b10000000  //  7     7   requested mode is ready
@@ -594,8 +595,6 @@ class SX127x: public PhysicalLayer {
       \param mod Instance of Module that will be used to communicate with the %LoRa chip.
     */
     SX127x(Module* mod);
-
-    Module* getMod();
 
     // basic methods
 
@@ -824,13 +823,16 @@ class SX127x: public PhysicalLayer {
     
     /*!
       \brief Interrupt-driven receive method, implemented for compatibility with PhysicalLayer.
-      \param mode Receive mode to be used.
+      \param timeout Receive mode type and/or raw timeout value in symbols.
+      When set to 0, the timeout will be infinite and the device will remain
+      in Rx mode until explicitly commanded to stop (Rx continuous mode).
+      When non-zero (maximum 1023), the device will be set to Rx single mode and timeout will be set.
       \param irqFlags Ignored.
       \param irqMask Ignored.
       \param len Expected length of packet to be received. Required for LoRa spreading factor 6.
       \returns \ref status_codes
     */
-    int16_t startReceive(uint32_t mode, uint16_t irqFlags, uint16_t irqMask, size_t len);
+    int16_t startReceive(uint32_t timeout, uint16_t irqFlags, uint16_t irqMask, size_t len);
 
     /*!
       \brief Reads data that was received after calling startReceive method. When the packet length is not known in advance,
@@ -1042,11 +1044,39 @@ class SX127x: public PhysicalLayer {
     int16_t variablePacketLengthMode(uint8_t maxLen = RADIOLIB_SX127X_MAX_PACKET_LENGTH_FSK);
 
     /*!
+      \brief Convert from bytes to LoRa symbols.
+      \param len Payload length in bytes.
+      \returns The total number of LoRa symbols, including preamble, sync and possible header.
+    */
+    float getNumSymbols(size_t len);
+
+    /*!
       \brief Get expected time-on-air for a given size of payload.
       \param len Payload length in bytes.
       \returns Expected time-on-air in microseconds.
     */
     uint32_t getTimeOnAir(size_t len) override;
+
+    /*!
+      \brief Calculate the timeout value for this specific module / series (in number of symbols or units of time)
+      \param timeoutUs Timeout in microseconds to listen for
+      \returns Timeout value in a unit that is specific for the used module
+    */
+    uint32_t calculateRxTimeout(uint32_t timeoutUs);
+
+    /*!
+      \brief Create the flags that make up RxDone and RxTimeout used for receiving downlinks
+      \param irqFlags The flags for which IRQs must be triggered
+      \param irqMask Mask indicating which IRQ triggers a DIO
+      \returns \ref status_codes
+    */
+    int16_t irqRxDoneRxTimeout(uint16_t &irqFlags, uint16_t &irqMask);
+
+    /*!
+      \brief Check whether the IRQ bit for RxTimeout is set
+      \returns \ref RxTimeout IRQ is set
+    */
+    bool isRxTimeout();
 
     /*!
       \brief Enable CRC filtering and generation.
@@ -1118,7 +1148,7 @@ class SX127x: public PhysicalLayer {
     */
     int16_t invertIQ(bool enable) override;
 
-    #if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
+    #if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
     /*!
       \brief Set interrupt service routine function to call when data bit is received in direct mode.
       \param func Pointer to interrupt service routine.
@@ -1186,40 +1216,51 @@ class SX127x: public PhysicalLayer {
     */
     int16_t setRSSIThreshold(float dbm);
 
-#if !defined(RADIOLIB_GODMODE) && !defined(RADIOLIB_LOW_LEVEL)
+    /*!
+      \brief Set low battery indicator threshold.
+      \param level Battery threshold level (one of RADIOLIB_SX127X_LOW_BAT_THRESHOLD_*),
+      or -1 to disable the detector. Disabled by default. Note that this will not attach any interrupts!
+      \param pin DIO pin number which will be used to signal low battery. Only DIO0/4 can be used
+      (in packet mode) or DIO3/4 (in continuous mode). Ignored when disabling the detector.
+      \returns \ref status_codes
+    */
+    int16_t setLowBatteryThreshold(int8_t level, uint32_t pin = RADIOLIB_NC);
+
+#if !RADIOLIB_GODMODE && !RADIOLIB_LOW_LEVEL
   protected:
 #endif
-    Module* mod;
+    Module* getMod();
 
-#if !defined(RADIOLIB_GODMODE)
+#if !RADIOLIB_GODMODE
   protected:
 #endif
-
     float frequency = 0;
     float bandwidth = 0;
     uint8_t spreadingFactor = 0;
-    uint8_t codingRate = 0;
-    float bitRate = 0;
-    bool ookEnabled = false;
-    bool crcEnabled = false;
-    bool crcOn = true; // default value used in FSK mode
     size_t packetLength = 0;
+    uint8_t codingRate = 0;
+    bool crcEnabled = false;
+    bool ookEnabled = false;
 
-    int16_t setFrequencyRaw(float newFreq);
-    int16_t setBitRateCommon(float br, uint8_t fracRegAddr);
-    int16_t config();
     int16_t configFSK();
     int16_t getActiveModem();
-    int16_t directMode();
-    int16_t setPacketMode(uint8_t mode, uint8_t len);
+    int16_t setFrequencyRaw(float newFreq);
+    int16_t setBitRateCommon(float br, uint8_t fracRegAddr);
 
-#if !defined(RADIOLIB_GODMODE)
+#if !RADIOLIB_GODMODE
   private:
 #endif
+    Module* mod;
+
+    float bitRate = 0;
+    bool crcOn = true; // default value used in FSK mode
     float dataRate = 0;
     bool packetLengthQueried = false; // FSK packet length is the first byte in FIFO, length can only be queried once
     uint8_t packetLengthConfig = RADIOLIB_SX127X_PACKET_VARIABLE;
 
+    int16_t config();
+    int16_t directMode();
+    int16_t setPacketMode(uint8_t mode, uint8_t len);
     bool findChip(uint8_t* vers, uint8_t num);
     int16_t setMode(uint8_t mode);
     int16_t setActiveModem(uint8_t modem);

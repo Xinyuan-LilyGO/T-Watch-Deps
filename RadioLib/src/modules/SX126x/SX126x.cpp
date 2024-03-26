@@ -1,15 +1,11 @@
 #include "SX126x.h"
 #include <string.h>
 #include <math.h>
-#if !defined(RADIOLIB_EXCLUDE_SX126X)
+#if !RADIOLIB_EXCLUDE_SX126X
 
 SX126x::SX126x(Module* mod) : PhysicalLayer(RADIOLIB_SX126X_FREQUENCY_STEP_SIZE, RADIOLIB_SX126X_MAX_PACKET_LENGTH) {
   this->mod = mod;
   this->XTAL = false;
-}
-
-Module* SX126x::getMod() {
-  return(this->mod);
 }
 
 int16_t SX126x::begin(uint8_t cr, uint8_t syncWord, uint16_t preambleLength, float tcxoVoltage, bool useRegulatorLDO) {
@@ -984,6 +980,27 @@ int16_t SX126x::setDataRate(DataRate_t dr) {
   return(state);
 }
 
+int16_t SX126x::checkDataRate(DataRate_t dr) {
+  int16_t state = RADIOLIB_ERR_UNKNOWN;
+
+  // select interpretation based on active modem
+  uint8_t modem = this->getPacketType();
+  if(modem == RADIOLIB_SX126X_PACKET_TYPE_GFSK) {
+    RADIOLIB_CHECK_RANGE(dr.fsk.bitRate, 0.6, 300.0, RADIOLIB_ERR_INVALID_BIT_RATE);
+    RADIOLIB_CHECK_RANGE(dr.fsk.freqDev, 0.6, 200.0, RADIOLIB_ERR_INVALID_FREQUENCY_DEVIATION);
+    return(RADIOLIB_ERR_NONE);
+
+  } else if(modem == RADIOLIB_SX126X_PACKET_TYPE_LORA) {
+    RADIOLIB_CHECK_RANGE(dr.lora.spreadingFactor, 5, 12, RADIOLIB_ERR_INVALID_SPREADING_FACTOR);
+    RADIOLIB_CHECK_RANGE(dr.lora.bandwidth, 0.0, 510.0, RADIOLIB_ERR_INVALID_BANDWIDTH);
+    RADIOLIB_CHECK_RANGE(dr.lora.codingRate, 5, 8, RADIOLIB_ERR_INVALID_CODING_RATE);
+    return(RADIOLIB_ERR_NONE);
+  
+  }
+
+  return(state);
+}
+
 int16_t SX126x::setRxBandwidth(float rxBw) {
   // check active modem
   if(getPacketType() != RADIOLIB_SX126X_PACKET_TYPE_GFSK) {
@@ -1436,6 +1453,25 @@ uint32_t SX126x::getTimeOnAir(size_t len) {
   }
 }
 
+uint32_t SX126x::calculateRxTimeout(uint32_t timeoutUs) {
+  // the timeout value is given in units of 15.625 microseconds
+  // the calling function should provide some extra width, as this number of units is truncated to integer
+  uint32_t timeout = timeoutUs / 15.625;
+  return(timeout);
+}
+
+int16_t SX126x::irqRxDoneRxTimeout(uint16_t &irqFlags, uint16_t &irqMask) {
+  irqFlags = RADIOLIB_SX126X_IRQ_RX_DEFAULT;  // flags that can appear in the IRQ register
+  irqMask  = RADIOLIB_SX126X_IRQ_RX_DONE | RADIOLIB_SX126X_IRQ_TIMEOUT; // flags that will trigger DIO0
+  return(RADIOLIB_ERR_NONE);
+}
+
+bool SX126x::isRxTimeout() {
+  uint16_t irq = getIrqStatus();
+  bool rxTimedOut = irq & RADIOLIB_SX126X_IRQ_TIMEOUT;
+  return(rxTimedOut);
+}
+
 int16_t SX126x::implicitHeader(size_t len) {
   return(setHeaderType(RADIOLIB_SX126X_LORA_HEADER_IMPLICIT, len));
 }
@@ -1528,7 +1564,7 @@ int16_t SX126x::invertIQ(bool enable) {
   return(setPacketParams(this->preambleLengthLoRa, this->crcTypeLoRa, this->implicitLen, this->headerType, this->invertIQEnabled));
 }
 
-#if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
+#if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
 void SX126x::setDirectAction(void (*func)(void)) {
   setDio1Action(func);
 }
@@ -1544,7 +1580,7 @@ int16_t SX126x::uploadPatch(const uint32_t* patch, size_t len, bool nonvolatile)
   RADIOLIB_ASSERT(state);
 
   // check the version
-  #if defined(RADIOLIB_DEBUG)
+  #if RADIOLIB_DEBUG
   char ver_pre[16];
   this->mod->SPIreadRegisterBurst(RADIOLIB_SX126X_REG_VERSION_STRING, 16, (uint8_t*)ver_pre);
   RADIOLIB_DEBUG_PRINTLN("Pre-update version string: %s", ver_pre);
@@ -1576,7 +1612,7 @@ int16_t SX126x::uploadPatch(const uint32_t* patch, size_t len, bool nonvolatile)
   this->mod->SPIwriteStream(RADIOLIB_SX126X_CMD_PRAM_UPDATE, NULL, 0);
 
   // check the version again
-  #if defined(RADIOLIB_DEBUG)
+  #if RADIOLIB_DEBUG
   char ver_post[16];
   this->mod->SPIreadRegisterBurst(RADIOLIB_SX126X_REG_VERSION_STRING, 16, (uint8_t*)ver_post);
   RADIOLIB_DEBUG_PRINTLN("Post-update version string: %s", ver_post);
@@ -1732,7 +1768,7 @@ int16_t SX126x::setCad(uint8_t symbolNum, uint8_t detPeak, uint8_t detMin) {
   To address this, the user override has been commented out, ensuring consistent application of the optimal CAD settings as 
     per Semtech's Application Note AN1200.48 (page 41) for the 125KHz setting. This approach significantly reduces false CAD occurrences.
     Testing has shown that there is no reason for a user to change CAD settings for anything other than most optimal ones described in AN1200.48 .
-  However, this change deos not respect CAD configs from the LoRaWAN layer. Future considerations or use cases might require revisiting this decision.
+  However, this change does not respect CAD configs from the LoRaWAN layer. Future considerations or use cases might require revisiting this decision.
   Hence this note.
 */
 
@@ -1751,7 +1787,9 @@ int16_t SX126x::setCad(uint8_t symbolNum, uint8_t detPeak, uint8_t detMin) {
   }
 
 */
-
+  (void)symbolNum;
+  (void)detPeak;
+  (void)detMin;
 
   // configure parameters
   int16_t state = this->mod->SPIwriteStream(RADIOLIB_SX126X_CMD_SET_CAD_PARAMS, data, 7);
@@ -1814,11 +1852,12 @@ int16_t SX126x::setRfFrequency(uint32_t frf) {
   return(this->mod->SPIwriteStream(RADIOLIB_SX126X_CMD_SET_RF_FREQUENCY, data, 4));
 }
 
-int16_t SX126x::calibrateImage(uint8_t* data) {
+int16_t SX126x::calibrateImage(float freqMin, float freqMax) {
+  uint8_t data[] = { (uint8_t)floor((freqMin - 1.0f) / 4.0f), (uint8_t)ceil((freqMax + 1.0f) / 4.0f) };
   int16_t state = this->mod->SPIwriteStream(RADIOLIB_SX126X_CMD_CALIBRATE_IMAGE, data, 2);
 
   // if something failed, show the device errors
-  #if defined(RADIOLIB_DEBUG)
+  #if RADIOLIB_DEBUG
   if(state != RADIOLIB_ERR_NONE) {
     // unless mode is forced to standby, device errors will be 0
     standby();
@@ -2031,6 +2070,10 @@ int16_t SX126x::fixInvertedIQ(uint8_t iqConfig) {
   return(writeRegister(RADIOLIB_SX126X_REG_IQ_CONFIG, &iqConfigCurrent, 1));
 }
 
+Module* SX126x::getMod() {
+  return(this->mod);
+}
+
 int16_t SX126x::config(uint8_t modem) {
   // reset buffer base address
   int16_t state = setBufferBaseAddress();
@@ -2078,7 +2121,7 @@ int16_t SX126x::config(uint8_t modem) {
   state = this->mod->SPIcheckStream();
 
   // if something failed, show the device errors
-  #if defined(RADIOLIB_DEBUG)
+  #if RADIOLIB_DEBUG
   if(state != RADIOLIB_ERR_NONE) {
     // unless mode is forced to standby, device errors will be 0
     standby();
@@ -2121,7 +2164,7 @@ bool SX126x::findChip(const char* verStr) {
       RADIOLIB_DEBUG_PRINTLN();
       flagFound = true;
     } else {
-      #if defined(RADIOLIB_DEBUG)
+      #if RADIOLIB_DEBUG
         RADIOLIB_DEBUG_PRINTLN("SX126x not found! (%d of 10 tries) RADIOLIB_SX126X_REG_VERSION_STRING:", i + 1);
         RADIOLIB_DEBUG_HEXDUMP((uint8_t*)version, 16, RADIOLIB_SX126X_REG_VERSION_STRING);
         RADIOLIB_DEBUG_PRINTLN("Expected string: %s", verStr);

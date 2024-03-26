@@ -3,7 +3,7 @@
 
 #include "../../TypeDef.h"
 
-#if !defined(RADIOLIB_EXCLUDE_RF69)
+#if !RADIOLIB_EXCLUDE_RF69
 
 #include "../../Module.h"
 
@@ -490,8 +490,6 @@ class RF69: public PhysicalLayer {
     */
     RF69(Module* module);
 
-    Module* getMod();
-
     // basic methods
 
     /*!
@@ -973,7 +971,7 @@ class RF69: public PhysicalLayer {
    */
     int16_t getChipVersion();
 
-    #if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
+    #if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
     /*!
       \brief Set interrupt service routine function to call when data bit is received in direct mode.
       \param func Pointer to interrupt service routine.
@@ -995,18 +993,26 @@ class RF69: public PhysicalLayer {
     */
     int16_t setDIOMapping(uint32_t pin, uint32_t value);
 
-#if !defined(RADIOLIB_GODMODE) && !defined(RADIOLIB_LOW_LEVEL)
+#if !RADIOLIB_GODMODE && !RADIOLIB_LOW_LEVEL
   protected:
+#endif
+    Module* getMod();
+
+#if !RADIOLIB_GODMODE
+  protected:
+#endif
+    float bitRate = RADIOLIB_RF69_DEFAULT_BR;
+    float rxBandwidth = RADIOLIB_RF69_DEFAULT_RXBW;
+    
+    int16_t config();
+    int16_t setMode(uint8_t mode);
+
+#if !RADIOLIB_GODMODE
+  private:
 #endif
     Module* mod;
 
-#if !defined(RADIOLIB_GODMODE)
-  protected:
-#endif
-
     float frequency = RADIOLIB_RF69_DEFAULT_FREQ;
-    float bitRate = RADIOLIB_RF69_DEFAULT_BR;
-    float rxBandwidth = RADIOLIB_RF69_DEFAULT_RXBW;
     bool ookEnabled = false;
     int16_t tempOffset = 0;
     int8_t power = RADIOLIB_RF69_DEFAULT_POWER;
@@ -1021,14 +1027,8 @@ class RF69: public PhysicalLayer {
 
     bool bitSync = true;
 
-    int16_t config();
     int16_t directMode();
     int16_t setPacketMode(uint8_t mode, uint8_t len);
-
-#if !defined(RADIOLIB_GODMODE)
-  private:
-#endif
-    int16_t setMode(uint8_t mode);
     void clearIRQFlags();
     void clearFIFO(size_t count);
 };

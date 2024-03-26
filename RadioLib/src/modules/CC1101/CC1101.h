@@ -1,4 +1,4 @@
-#if !defined(_RADIOLIB_CC1101_H) && !defined(RADIOLIB_EXCLUDE_CC1101)
+#if !defined(_RADIOLIB_CC1101_H) && !RADIOLIB_EXCLUDE_CC1101
 #define _RADIOLIB_CC1101_H
 
 #include "../../TypeDef.h"
@@ -541,8 +541,6 @@ class CC1101: public PhysicalLayer {
     */
     CC1101(Module* module);
 
-    Module* getMod();
-
     // basic methods
 
     /*!
@@ -922,7 +920,7 @@ class CC1101: public PhysicalLayer {
    */
     int16_t getChipVersion();
 
-    #if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
+    #if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
     /*!
       \brief Set interrupt service routine function to call when data bit is receveid in direct mode.
       \param func Pointer to interrupt service routine.
@@ -944,24 +942,25 @@ class CC1101: public PhysicalLayer {
     */
     int16_t setDIOMapping(uint32_t pin, uint32_t value);
 
-  #if !defined(RADIOLIB_GODMODE) && !defined(RADIOLIB_LOW_LEVEL)
+  #if !RADIOLIB_GODMODE && !RADIOLIB_LOW_LEVEL
     protected:
   #endif
-      Module* mod;
+    Module* getMod();
 
-      // SPI read overrides to set bit for burst write and status registers access
-      int16_t SPIgetRegValue(uint8_t reg, uint8_t msb = 7, uint8_t lsb = 0);
-      int16_t SPIsetRegValue(uint8_t reg, uint8_t value, uint8_t msb = 7, uint8_t lsb = 0, uint8_t checkInterval = 2);
-      void SPIreadRegisterBurst(uint8_t reg, uint8_t numBytes, uint8_t* inBytes);
-      uint8_t SPIreadRegister(uint8_t reg);
-      void SPIwriteRegisterBurst(uint8_t reg, uint8_t* data, size_t len);
-      void SPIwriteRegister(uint8_t reg, uint8_t data);
+    // SPI read overrides to set bit for burst write and status registers access
+    int16_t SPIgetRegValue(uint8_t reg, uint8_t msb = 7, uint8_t lsb = 0);
+    int16_t SPIsetRegValue(uint8_t reg, uint8_t value, uint8_t msb = 7, uint8_t lsb = 0, uint8_t checkInterval = 2);
+    void SPIreadRegisterBurst(uint8_t reg, uint8_t numBytes, uint8_t* inBytes);
+    uint8_t SPIreadRegister(uint8_t reg);
+    void SPIwriteRegisterBurst(uint8_t reg, uint8_t* data, size_t len);
+    void SPIwriteRegister(uint8_t reg, uint8_t data);
 
-      void SPIsendCommand(uint8_t cmd);
+    void SPIsendCommand(uint8_t cmd);
 
-  #if !defined(RADIOLIB_GODMODE)
-    protected:
+  #if !RADIOLIB_GODMODE
+    private:
   #endif
+    Module* mod;
 
     float frequency = RADIOLIB_CC1101_DEFAULT_FREQ;
     float bitRate = RADIOLIB_CC1101_DEFAULT_BR;

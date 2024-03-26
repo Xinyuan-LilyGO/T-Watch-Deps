@@ -279,6 +279,13 @@ class PhysicalLayer {
     virtual int16_t setDataRate(DataRate_t dr);
 
     /*!
+      \brief Check the data rate can be configured by this module. Must be implemented in module class if the module supports it.
+      \param dr Data rate struct. Interpretation depends on currently active modem (FSK or LoRa).
+      \returns \ref status_codes
+    */
+    virtual int16_t checkDataRate(DataRate_t dr);
+
+    /*!
       \brief Gets the module frequency step size that was set in constructor.
       \returns Synthesizer frequency step size in Hz.
     */
@@ -309,7 +316,28 @@ class PhysicalLayer {
       \returns Expected time-on-air in microseconds.
     */
     virtual uint32_t getTimeOnAir(size_t len);
-    
+
+    /*!
+      \brief Calculate the timeout value for this specific module / series (in number of symbols or units of time)
+      \param timeoutUs Timeout in microseconds to listen for
+      \returns Timeout value in a unit that is specific for the used module
+    */
+    virtual uint32_t calculateRxTimeout(uint32_t timeoutUs);
+
+    /*!
+      \brief Create the flags that make up RxDone and RxTimeout used for receiving downlinks
+      \param irqFlags The flags for which IRQs must be triggered
+      \param irqMask Mask indicating which IRQ triggers a DIO
+      \returns \ref status_codes
+    */
+    virtual int16_t irqRxDoneRxTimeout(uint16_t &irqFlags, uint16_t &irqMask);
+
+    /*!
+      \brief Check whether the IRQ bit for RxTimeout is set
+      \returns \ref RxTimeout IRQ is set
+    */
+    virtual bool isRxTimeout();
+
     /*!
       \brief Interrupt-driven channel activity detection method. interrupt will be activated
       when packet is detected. Must be implemented in module class.
@@ -359,7 +387,7 @@ class PhysicalLayer {
     */
     int16_t startDirect();
 
-    #if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
+    #if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
     /*!
       \brief Set sync word to be used to determine start of packet in direct reception mode.
       \param syncWord Sync word bits.
@@ -442,7 +470,7 @@ class PhysicalLayer {
     */
     virtual void clearChannelScanAction();
 
-    #if defined(RADIOLIB_INTERRUPT_TIMING)
+    #if RADIOLIB_INTERRUPT_TIMING
 
     /*!
       \brief Set function to be called to set up the timing interrupt.
@@ -459,18 +487,18 @@ class PhysicalLayer {
 
     #endif
 
-#if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
+#if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
   protected:
     void updateDirectBuffer(uint8_t bit);
 #endif
 
-#if !defined(RADIOLIB_GODMODE)
+#if !RADIOLIB_GODMODE
   private:
 #endif
     float freqStep;
     size_t maxPacketLength;
 
-    #if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
+    #if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
     uint8_t bufferBitPos;
     uint8_t bufferWritePos;
     uint8_t bufferReadPos;

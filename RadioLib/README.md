@@ -25,7 +25,7 @@ RadioLib was originally created as a driver for [__RadioShield__](https://github
 * __SX126x__ series LoRa modules (SX1261, SX1262, SX1268)
 * __SX127x__ series LoRa modules (SX1272, SX1273, SX1276, SX1277, SX1278, SX1279)
 * __SX128x__ series LoRa/GFSK/BLE/FLRC modules (SX1280, SX1281, SX1282)
-* __SX1231__ FSK/OOK radio module
+* __SX123x__ FSK/OOK radio modules (SX1231, SX1233)
 
 ### Supported protocols and digital modes:
 * [__AX.25__](https://www.sigidwiki.com/wiki/PACKET) using 2-FSK or AFSK for modules:  
@@ -43,7 +43,8 @@ SX127x, RFM9x, SX126x, RF69, SX1231, CC1101, nRF24L01, RFM2x, Si443x and SX128x
 * [__POCSAG__](https://www.sigidwiki.com/wiki/POCSAG) using 2-FSK for modules:  
 SX127x, RFM9x, RF69, SX1231, CC1101, nRF24L01, RFM2x and Si443x
 * [__LoRaWAN__](https://lora-alliance.org/) using LoRa for modules:  
-SX127x, RFM9x, SX126x and SX128x
+SX127x, RFM9x, SX126x and SX128x  
+  * NOTE: LoRaWAN support is currently in beta, feedback via [Issues](https://github.com/jgromes/RadioLib/issues) and [Discussions](https://github.com/jgromes/RadioLib/discussions) is appreciated!
 
 ### Supported Arduino platforms:
 * __Arduino__  

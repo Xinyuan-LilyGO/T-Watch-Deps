@@ -1,13 +1,9 @@
 #include "RF69.h"
 #include <math.h>
-#if !defined(RADIOLIB_EXCLUDE_RF69)
+#if !RADIOLIB_EXCLUDE_RF69
 
 RF69::RF69(Module* module) : PhysicalLayer(RADIOLIB_RF69_FREQUENCY_STEP_SIZE, RADIOLIB_RF69_MAX_PACKET_LENGTH)  {
   this->mod = module;
-}
-
-Module* RF69::getMod() {
-  return(this->mod);
 }
 
 int16_t RF69::begin(float freq, float br, float freqDev, float rxBw, int8_t pwr, uint8_t preambleLen) {
@@ -375,7 +371,7 @@ bool RF69::fifoGet(volatile uint8_t* data, int totalLen, volatile int* rcvLen) {
 
   // get the data
   this->mod->SPIreadRegisterBurst(RADIOLIB_RF69_REG_FIFO, len, dataPtr);
-  (*rcvLen) += (len);
+  *rcvLen = *rcvLen + len;
 
   // check if we're done
   if(*rcvLen >= totalLen) {
@@ -960,7 +956,7 @@ uint8_t RF69::randomByte() {
   return(randByte);
 }
 
-#if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
+#if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
 void RF69::setDirectAction(void (*func)(void)) {
   setDio1Action(func);
 }
@@ -980,6 +976,10 @@ int16_t RF69::setDIOMapping(uint32_t pin, uint32_t value) {
   }
 
   return(this->mod->SPIsetRegValue(RADIOLIB_RF69_REG_DIO_MAPPING_2, value, 15 - 2 * pin, 14 - 2 * pin));
+}
+
+Module* RF69::getMod() {
+  return(this->mod);
 }
 
 int16_t RF69::getChipVersion() {

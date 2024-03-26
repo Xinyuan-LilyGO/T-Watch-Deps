@@ -310,11 +310,12 @@ class IRsend {
   void sendSherwood(uint64_t data, uint16_t nbits = kSherwoodBits,
                     uint16_t repeat = kSherwoodMinRepeat);
 #endif
-#if SEND_SAMSUNG
+  // `sendSAMSUNG()` is required by `sendLG()`
+#if (SEND_SAMSUNG || SEND_LG)
   void sendSAMSUNG(const uint64_t data, const uint16_t nbits = kSamsungBits,
                    const uint16_t repeat = kNoRepeat);
   uint32_t encodeSAMSUNG(const uint8_t customer, const uint8_t command);
-#endif
+#endif  // (SEND_SAMSUNG || SEND_LG)
 #if SEND_SAMSUNG36
   void sendSamsung36(const uint64_t data, const uint16_t nbits = kSamsung36Bits,
                      const uint16_t repeat = kNoRepeat);
@@ -879,6 +880,11 @@ class IRsend {
   void sendWowwee(const uint64_t data, const uint16_t nbits = kWowweeBits,
                   const uint16_t repeat = kWowweeDefaultRepeat);
 #endif  // SEND_WOWWEE
+#if SEND_YORK
+  void sendYork(const unsigned char data[],
+                    const uint16_t nbytes = kYorkStateLength,
+                    const uint16_t repeat = kNoRepeat);
+#endif  // SEND_YORK
 
  protected:
 #ifdef UNIT_TEST

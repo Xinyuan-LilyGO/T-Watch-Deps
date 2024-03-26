@@ -41,7 +41,6 @@
 #include "AudioOutput.h"
 #include "AudioOutputI2S.h"
 #include "AudioOutputI2SNoDAC.h"
-#include "AudioOutputPWM.h"
 #include "AudioOutputMixer.h"
 #include "AudioOutputNull.h"
 #include "AudioOutputSerialWAV.h"

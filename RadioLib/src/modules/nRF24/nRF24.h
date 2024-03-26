@@ -1,4 +1,4 @@
-#if !defined(_RADIOLIB_NRF24_H) && !defined(RADIOLIB_EXCLUDE_NRF24)
+#if !defined(_RADIOLIB_NRF24_H) && !RADIOLIB_EXCLUDE_NRF24
 #define _RADIOLIB_NRF24_H
 
 #include "../../Module.h"
@@ -194,8 +194,6 @@ class nRF24: public PhysicalLayer {
       \param mod Instance of Module that will be used to communicate with the radio.
     */
     nRF24(Module* mod);
-
-    Module* getMod();
 
     // basic methods
 
@@ -467,18 +465,19 @@ class nRF24: public PhysicalLayer {
     */
     int16_t setEncoding(uint8_t encoding) override;
 
-#if !defined(RADIOLIB_GODMODE) && !defined(RADIOLIB_LOW_LEVEL)
+#if !RADIOLIB_GODMODE && !RADIOLIB_LOW_LEVEL
   protected:
 #endif
-    Module* mod;
+    Module* getMod();
 
     void SPIreadRxPayload(uint8_t* data, uint8_t numBytes);
     void SPIwriteTxPayload(uint8_t* data, uint8_t numBytes);
     void SPItransfer(uint8_t cmd, bool write = false, uint8_t* dataOut = NULL, uint8_t* dataIn = NULL, uint8_t numBytes = 0);
 
-#if !defined(RADIOLIB_GODMODE)
-  protected:
+#if !RADIOLIB_GODMODE
+  private:
 #endif
+    Module* mod;
 
     int16_t frequency = RADIOLIB_NRF24_DEFAULT_FREQ;
     int16_t dataRate = RADIOLIB_NRF24_DEFAULT_DR;

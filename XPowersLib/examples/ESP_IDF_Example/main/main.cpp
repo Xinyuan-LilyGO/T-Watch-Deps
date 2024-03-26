@@ -17,8 +17,9 @@ Please do not run the example without knowing the external load voltage of the P
 it may burn your external load, please check the voltage setting before running the example,
 if there is any loss, please bear it by yourself
 */
-// #error "Running this example is known to not damage the device! Please go and uncomment this!"
-
+#ifndef XPOWERS_NO_ERROR
+#error "Running this example is known to not damage the device! Please go and uncomment this!"
+#endif
 
 static const char *TAG = "mian";
 
@@ -60,13 +61,17 @@ extern "C" void app_main(void)
     // Register PMU interrupt pins
     irq_init();
 
+#if CONFIG_I2C_COMMUNICATION_METHOD_CALLBACK_RW || \
+    ((ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)) && defined(CONFIG_XPOWERS_ESP_IDF_NEW_API))
     ESP_ERROR_CHECK(i2c_init());
-
     ESP_LOGI(TAG, "I2C initialized successfully");
+#endif
 
     ESP_ERROR_CHECK(pmu_init());
 
     xTaskCreate(pmu_hander_task, "App/pwr", 4 * 1024, NULL, 10, NULL);
+
+    ESP_LOGI(TAG, "Run...");
 
 }
 

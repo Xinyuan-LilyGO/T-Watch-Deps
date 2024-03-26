@@ -35,7 +35,6 @@ extern "C" {
 #endif  // IRAM_ATTR
 #endif  // ESP8266
 #if defined(ESP32)
-#include <driver/gpio.h>
 #define USE_IRAM_ATTR IRAM_ATTR
 #endif  // ESP32
 #endif  // USE_IRAM_ATTR
@@ -243,12 +242,8 @@ static void USE_IRAM_ATTR gpio_intr() {
   // @see https://github.com/espressif/arduino-esp32/blob/6b0114366baf986c155e8173ab7c22bc0c5fcedc/cores/esp32/esp32-hal-timer.c#L176-L178
   timer->dev->config.alarm_en = 1;
 #else  // _ESP32_IRRECV_TIMER_HACK
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)
-  timerAlarm(timer, MS_TO_USEC(params.timeout), false, 0);
-#else
   timerWrite(timer, 0);
   timerAlarmEnable(timer);
-#endif
 #endif  // _ESP32_IRRECV_TIMER_HACK
 #endif  // ESP32
 }
@@ -363,13 +358,8 @@ void IRrecv::enableIRIn(const bool pullup) {
   }
 #if defined(ESP32)
   // Initialise the ESP32 timer.
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)
-  // Set timer frequency to 1Mhz
-  timer = timerBegin(1000000);
-#else
   // 80MHz / 80 = 1 uSec granularity.
   timer = timerBegin(_timer_num, 80, true);
-#endif
 #ifdef DEBUG
   if (timer == NULL) {
     DPRINT("FATAL: Unable enable system timer: ");
@@ -378,16 +368,11 @@ void IRrecv::enableIRIn(const bool pullup) {
 #endif  // DEBUG
   assert(timer != NULL);  // Check we actually got the timer.
   // Set the timer so it only fires once, and set it's trigger in uSeconds.
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)
-  timerAlarm(timer, MS_TO_USEC(params.timeout), false, 0);
-  timerAttachInterrupt(timer, &read_timeout);
-#else
   timerAlarmWrite(timer, MS_TO_USEC(params.timeout), ONCE);
   // Note: Interrupt needs to be attached before it can be enabled or disabled.
   // Note: EDGE (true) is not supported, use LEVEL (false). Ref: #1713
   // See: https://github.com/espressif/arduino-esp32/blob/caef4006af491130136b219c1205bdcf8f08bf2b/cores/esp32/esp32-hal-timer.c#L224-L227
   timerAttachInterrupt(timer, &read_timeout, false);
-#endif
 #endif  // ESP32
 
   // Initialise state machine variables
@@ -413,13 +398,9 @@ void IRrecv::disableIRIn(void) {
   os_timer_disarm(&timer);
 #endif  // ESP8266
 #if defined(ESP32)
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)
+  timerAlarmDisable(timer);
   timerDetachInterrupt(timer);
   timerEnd(timer);
-#else
-  timerAlarmDisable(timer);
-  timerEnd(timer);
-#endif
 #endif  // ESP32
   detachInterrupt(params.recvpin);
 #endif  // UNIT_TEST
@@ -445,11 +426,7 @@ void IRrecv::resume(void) {
   params.rawlen = 0;
   params.overflow = false;
 #if defined(ESP32)
-#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5,0,0)
-  timerEnd(timer);
-#else
   timerAlarmDisable(timer);
-#endif
   gpio_intr_enable((gpio_num_t)params.recvpin);
 #endif  // ESP32
 }
@@ -725,9 +702,12 @@ bool IRrecv::decode(decode_results *results, irparams_t *save,
       return true;
 #endif
 #if DECODE_PANASONIC
-    DPRINTLN("Attempting Panasonic decode");
+    DPRINTLN("Attempting Panasonic (48-bit) decode");
     if (decodePanasonic(results, offset)) return true;
-#endif
+    DPRINTLN("Attempting Panasonic (40-bit) decode");
+    if (decodePanasonic(results, offset, kPanasonic40Bits, true,
+                        kPanasonic40Manufacturer)) return true;
+#endif  // DECODE_PANASONIC
 #if DECODE_LG
     DPRINTLN("Attempting LG (28-bit) decode");
     if (decodeLG(results, offset, kLgBits, true)) return true;
@@ -1201,6 +1181,10 @@ bool IRrecv::decode(decode_results *results, irparams_t *save,
     DPRINTLN("Attempting Carrier A/C 84-bit decode");
     if (decodeCarrierAC84(results, offset)) return true;
 #endif  // DECODE_CARRIER_AC84
+#if DECODE_YORK
+    DPRINTLN("Attempting York decode");
+    if (decodeYork(results, offset, kYorkBits)) return true;
+#endif  // DECODE_YORK
   // Typically new protocols are added above this line.
   }
 #if DECODE_HASH

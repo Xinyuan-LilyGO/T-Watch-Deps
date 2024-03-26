@@ -58,19 +58,35 @@ void inline ArduinoHal::detachInterrupt(uint32_t interruptNum) {
 }
 
 void inline ArduinoHal::delay(unsigned long ms) {
+#if !defined(RADIOLIB_CLOCK_DRIFT_MS)
   ::delay(ms);
+#else
+  ::delay(ms * 1000 / (1000 + RADIOLIB_CLOCK_DRIFT_MS));
+#endif
 }
 
 void inline ArduinoHal::delayMicroseconds(unsigned long us) {
+#if !defined(RADIOLIB_CLOCK_DRIFT_MS)
   ::delayMicroseconds(us);
+#else
+  ::delayMicroseconds(us * 1000 / (1000 + RADIOLIB_CLOCK_DRIFT_MS));
+#endif
 }
 
 unsigned long inline ArduinoHal::millis() {
+#if !defined(RADIOLIB_CLOCK_DRIFT_MS)
   return(::millis());
+#else
+  return(::millis() * 1000 / (1000 + RADIOLIB_CLOCK_DRIFT_MS));
+#endif
 }
 
 unsigned long inline ArduinoHal::micros() {
+#if !defined(RADIOLIB_CLOCK_DRIFT_MS)
   return(::micros());
+#else
+  return(::micros() * 1000 / (1000 + RADIOLIB_CLOCK_DRIFT_MS));
+#endif
 }
 
 long inline ArduinoHal::pulseIn(uint32_t pin, uint32_t state, unsigned long timeout) {
@@ -104,7 +120,7 @@ void inline ArduinoHal::spiEnd() {
 
 void ArduinoHal::readPersistentStorage(uint32_t addr, uint8_t* buff, size_t len) {
   #if !defined(RADIOLIB_EEPROM_UNSUPPORTED)
-    #if defined(RADIOLIB_ESP32)
+    #if defined(RADIOLIB_ESP32) || defined(ARDUINO_ARCH_RP2040)
       EEPROM.begin(RADIOLIB_HAL_PERSISTENT_STORAGE_SIZE);
     #elif defined(ARDUINO_ARCH_APOLLO3)
       EEPROM.init();
@@ -112,15 +128,19 @@ void ArduinoHal::readPersistentStorage(uint32_t addr, uint8_t* buff, size_t len)
     for(size_t i = 0; i < len; i++) {
       buff[i] = EEPROM.read(addr + i);
     }
-    #if defined(RADIOLIB_ESP32)
+    #if defined(RADIOLIB_ESP32) || defined(ARDUINO_ARCH_RP2040)
       EEPROM.end();
     #endif
+  #else
+    (void)addr;
+    (void)buff;
+    (void)len;
   #endif
 }
 
 void ArduinoHal::writePersistentStorage(uint32_t addr, uint8_t* buff, size_t len) {
   #if !defined(RADIOLIB_EEPROM_UNSUPPORTED)
-    #if defined(RADIOLIB_ESP32)
+    #if defined(RADIOLIB_ESP32) || defined(ARDUINO_ARCH_RP2040)
       EEPROM.begin(RADIOLIB_HAL_PERSISTENT_STORAGE_SIZE);
     #elif defined(ARDUINO_ARCH_APOLLO3)
       EEPROM.init();
@@ -128,10 +148,14 @@ void ArduinoHal::writePersistentStorage(uint32_t addr, uint8_t* buff, size_t len
     for(size_t i = 0; i < len; i++) {
       EEPROM.write(addr + i, buff[i]);
     }
-    #if defined(RADIOLIB_ESP32)
+    #if defined(RADIOLIB_ESP32) || defined(ARDUINO_ARCH_RP2040)
       EEPROM.commit();
       EEPROM.end();
     #endif
+  #else
+    (void)addr;
+    (void)buff;
+    (void)len;
   #endif
 }
 
@@ -165,6 +189,10 @@ void inline ArduinoHal::tone(uint32_t pin, unsigned int frequency, unsigned long
     }
     pwmPin->period(1.0 / frequency);
     pwmPin->write(0.5);
+  #else
+    (void)pin;
+    (void)frequency;
+    (void)duration;
   #endif
 }
 
@@ -199,6 +227,8 @@ void inline ArduinoHal::noTone(uint32_t pin) {
     // better tone for mbed OS boards
     (void)pin;
     pwmPin->suspend();
+  #else
+    (void)pin;
   #endif
 }
 

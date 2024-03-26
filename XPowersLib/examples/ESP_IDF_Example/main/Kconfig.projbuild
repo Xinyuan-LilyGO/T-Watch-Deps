@@ -2,15 +2,27 @@ menu "XPowersLib Configuration"
 
     choice PMU_Type
         prompt "XPowers chip type"
-        default XPOWERS_CHIP_AXP2102 if IDF_TARGET_ESP32
+        default XPOWERS_CHIP_AXP2101 if IDF_TARGET_ESP32
         default XPOWERS_CHIP_AXP192
         help
             Defines the default peripheral for xpowers example
 
-        config XPOWERS_CHIP_AXP2102
+        config XPOWERS_CHIP_AXP2101
             bool "Xpowers AXP2101"
         config XPOWERS_CHIP_AXP192
             bool "Xpowers AXP192"
+    endchoice
+
+    choice I2C_COMMUNICATION_METHOD
+        prompt "XPowersLIb read and write methods"
+        default I2C_COMMUNICATION_METHOD_BUILTIN_RW
+        help
+            Define XPowersLIb read and write methods
+
+        config I2C_COMMUNICATION_METHOD_BUILTIN_RW
+            bool "Implemented using built-in read and write methods"
+        config I2C_COMMUNICATION_METHOD_CALLBACK_RW
+            bool "Implemented using read and write callback methods"
     endchoice
 
     config I2C_MASTER_PORT_NUM

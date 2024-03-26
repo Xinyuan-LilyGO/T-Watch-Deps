@@ -3,7 +3,7 @@
 
 #include "../../TypeDef.h"
 
-#if !defined(RADIOLIB_EXCLUDE_SX128X)
+#if !RADIOLIB_EXCLUDE_SX128X
 
 #include "../../Module.h"
 
@@ -310,7 +310,7 @@
 #define RADIOLIB_SX128X_PACKET_STATUS_SYNC_DET_3                0b00000100  //  2     0                            detected sync word 3
 
 //RADIOLIB_SX128X_CMD_SET_DIO_IRQ_PARAMS
-#define RADIOLIB_SX128X_IRQ_RADIOLIB_PREAMBLE_DETECTED          0x8000      //  15    15  interrupt source: preamble detected
+#define RADIOLIB_SX128X_IRQ_PREAMBLE_DETECTED                   0x8000      //  15    15  interrupt source: preamble detected
 #define RADIOLIB_SX128X_IRQ_ADVANCED_RANGING_DONE               0x8000      //  15    15                    advanced ranging done
 #define RADIOLIB_SX128X_IRQ_RX_TX_TIMEOUT                       0x4000      //  14    14                    Rx or Tx timeout
 #define RADIOLIB_SX128X_IRQ_CAD_DETECTED                        0x2000      //  13    13                    channel activity detected
@@ -360,8 +360,6 @@ class SX128x: public PhysicalLayer {
       \param mod Instance of Module that will be used to communicate with the radio.
     */
     SX128x(Module* mod);
-
-    Module* getMod();
 
     // basic methods
 
@@ -765,7 +763,7 @@ class SX128x: public PhysicalLayer {
     */
     int16_t invertIQ(bool enable);
 
-    #if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
+    #if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
     /*!
       \brief Dummy method, to ensure PhysicalLayer compatibility.
       \param func Ignored.
@@ -779,14 +777,10 @@ class SX128x: public PhysicalLayer {
     void readBit(uint32_t pin);
     #endif
 
-#if !defined(RADIOLIB_GODMODE) && !defined(RADIOLIB_LOW_LEVEL)
+#if !RADIOLIB_GODMODE && !RADIOLIB_LOW_LEVEL
   protected:
 #endif
-    Module* mod;
-
-#if !defined(RADIOLIB_GODMODE)
-  protected:
-#endif
+    Module* getMod();
 
     // cached LoRa parameters
     float bandwidthKhz = 0;
@@ -815,18 +809,14 @@ class SX128x: public PhysicalLayer {
     int16_t setRangingRole(uint8_t role);
     int16_t setPacketType(uint8_t type);
 
-    int16_t setHeaderType(uint8_t hdrType, size_t len = 0xFF);
-
-#if !defined(RADIOLIB_GODMODE) && !defined(RADIOLIB_LOW_LEVEL)
+#if !RADIOLIB_GODMODE
   private:
 #endif
+    Module* mod;
 
     // common low-level SPI interface
     static int16_t SPIparseStatus(uint8_t in);
 
-#if !defined(RADIOLIB_GODMODE)
-  private:
-#endif
     // common parameters
     uint8_t power = 0;
 
@@ -846,6 +836,7 @@ class SX128x: public PhysicalLayer {
     uint8_t connectionState = 0, crcBLE = 0, bleTestPayload = 0;
 
     int16_t config(uint8_t modem);
+    int16_t setHeaderType(uint8_t hdrType, size_t len = 0xFF);
 };
 
 #endif

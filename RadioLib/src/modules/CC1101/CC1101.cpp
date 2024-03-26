@@ -1,13 +1,9 @@
 #include "CC1101.h"
 #include <math.h>
-#if !defined(RADIOLIB_EXCLUDE_CC1101)
+#if !RADIOLIB_EXCLUDE_CC1101
 
 CC1101::CC1101(Module* module) : PhysicalLayer(RADIOLIB_CC1101_FREQUENCY_STEP_SIZE, RADIOLIB_CC1101_MAX_PACKET_LENGTH) {
   this->mod = module;
-}
-
-Module* CC1101::getMod() {
-  return(this->mod);
 }
 
 int16_t CC1101::begin(float freq, float br, float freqDev, float rxBw, int8_t pwr, uint8_t preambleLength) {
@@ -143,8 +139,20 @@ int16_t CC1101::receive(uint8_t* data, size_t len) {
   int16_t state = startReceive();
   RADIOLIB_ASSERT(state);
 
-  // wait for packet or timeout
+  // wait for packet start or timeout
   uint32_t start = this->mod->hal->micros();
+  while(this->mod->hal->digitalRead(this->mod->getIrq())) {
+    this->mod->hal->yield();
+
+    if(this->mod->hal->micros() - start > timeout) {
+      standby();
+      SPIsendCommand(RADIOLIB_CC1101_CMD_FLUSH_RX);
+      return(RADIOLIB_ERR_RX_TIMEOUT);
+    }
+  }
+
+  // wait for packet end or timeout
+  start = this->mod->hal->micros();
   while(!this->mod->hal->digitalRead(this->mod->getIrq())) {
     this->mod->hal->yield();
 
@@ -202,6 +210,7 @@ int16_t CC1101::transmitDirect(bool sync, uint32_t frf) {
     SPIwriteRegister(RADIOLIB_CC1101_REG_FREQ0, frf & 0x0000FF);
 
     SPIsendCommand(RADIOLIB_CC1101_CMD_TX);
+    return(RADIOLIB_ERR_NONE);
   }
 
   // activate direct mode
@@ -928,7 +937,7 @@ int16_t CC1101::getChipVersion() {
   return(SPIgetRegValue(RADIOLIB_CC1101_REG_VERSION));
 }
 
-#if !defined(RADIOLIB_EXCLUDE_DIRECT_RECEIVE)
+#if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
 void CC1101::setDirectAction(void (*func)(void)) {
   setGdo0Action(func, this->mod->hal->GpioInterruptRising);
 }
@@ -1036,10 +1045,14 @@ int16_t CC1101::setPacketMode(uint8_t mode, uint16_t len) {
   state = SPIsetRegValue(RADIOLIB_CC1101_REG_PKTLEN, len);
   RADIOLIB_ASSERT(state);
 
-  // update the cached value
+  // update the cached values
   this->packetLength = len;
   this->packetLengthConfig = mode;
   return(state);
+}
+
+Module* CC1101::getMod() {
+  return(this->mod);
 }
 
 int16_t CC1101::SPIgetRegValue(uint8_t reg, uint8_t msb, uint8_t lsb) {

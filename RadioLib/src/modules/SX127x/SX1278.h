@@ -3,7 +3,7 @@
 
 #include "../../TypeDef.h"
 
-#if !defined(RADIOLIB_EXCLUDE_SX127X)
+#if !RADIOLIB_EXCLUDE_SX127X
 
 #include "../../Module.h"
 #include "SX127x.h"
@@ -193,6 +193,13 @@ class SX1278: public SX127x {
       \returns \ref status_codes
     */
     int16_t setDataRate(DataRate_t dr) override;
+    
+    /*!
+      \brief Check the data rate can be configured by this module.
+      \param dr Data rate struct. Interpretation depends on currently active modem (FSK or LoRa).
+      \returns \ref status_codes
+    */
+    int16_t checkDataRate(DataRate_t dr) override;
 
     /*!
       \brief Sets transmission output power. Allowed values range from -3 to 15 dBm (RFO pin) or +2 to +17 dBm (PA_BOOST pin).
@@ -282,7 +289,7 @@ class SX1278: public SX127x {
     */
     int16_t explicitHeader();
 
-#if !defined(RADIOLIB_GODMODE)
+#if !RADIOLIB_GODMODE
   protected:
 #endif
     int16_t setBandwidthRaw(uint8_t newBandwidth);
@@ -293,7 +300,7 @@ class SX1278: public SX127x {
     int16_t configFSK();
     void errataFix(bool rx);
 
-#if !defined(RADIOLIB_GODMODE)
+#if !RADIOLIB_GODMODE
   private:
 #endif
     bool ldroAuto = true;
@@ -305,7 +312,7 @@ class SX1278: public SX127x {
   \class RFM98
   \brief Only exists as alias for SX1278, since there seems to be no difference between %RFM98 and %SX1278 modules.
 */
-RADIOLIB_TYPE_ALIAS(SX1278, RFM98);
+RADIOLIB_TYPE_ALIAS(SX1278, RFM98)
 
 #endif
 

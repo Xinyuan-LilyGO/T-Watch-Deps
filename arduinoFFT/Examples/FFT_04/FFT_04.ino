@@ -31,7 +31,7 @@
 
 #include "arduinoFFT.h"
 
-arduinoFFT FFT = arduinoFFT(); /* Create FFT object */
+arduinoFFT FFT;
 /*
 These values can be changed in order to evaluate the functions
 */
@@ -61,18 +61,19 @@ void setup()
 void loop()
 {
   /* Build raw data */
-  double cycles = (((samples-1) * signalFrequency) / samplingFrequency); //Number of signal cycles that the sampling will read
+  double ratio = twoPi * signalFrequency / samplingFrequency; // Fraction of a complete cycle stored at each sample (in radians)
   for (uint16_t i = 0; i < samples; i++)
   {
-    vReal[i] = int8_t((amplitude * (sin((i * (twoPi * cycles)) / samples))) / 2.0);/* Build data with positive and negative values*/
-    //vReal[i] = uint8_t((amplitude * (sin((i * (twoPi * cycles)) / samples) + 1.0)) / 2.0);/* Build data displaced on the Y axis to include only positive values*/
+    vReal[i] = int8_t(amplitude * sin(i * ratio) / 2.0);/* Build data with positive and negative values*/
+    //vReal[i] = uint8_t((amplitude * (sin(i * ratio) + 1.0)) / 2.0);/* Build data displaced on the Y axis to include only positive values*/
     vImag[i] = 0.0; //Imaginary part must be zeroed in case of looping to avoid wrong calculations and overflows
   }
-  FFT.Windowing(vReal, samples, FFT_WIN_TYP_HAMMING, FFT_FORWARD);	/* Weigh data */
-  FFT.Compute(vReal, vImag, samples, FFT_FORWARD); /* Compute FFT */
-  FFT.ComplexToMagnitude(vReal, vImag, samples); /* Compute magnitudes */
+  FFT = arduinoFFT(vReal, vImag, samples, samplingFrequency); /* Create FFT object */
+  FFT.Windowing(FFT_WIN_TYP_HAMMING, FFT_FORWARD);	/* Weigh data */
+  FFT.Compute(FFT_FORWARD); /* Compute FFT */
+  FFT.ComplexToMagnitude(); /* Compute magnitudes */
   PrintVector(vReal, samples>>1, SCL_PLOT);
-  double x = FFT.MajorPeak(vReal, samples, samplingFrequency);
+  double x = FFT.MajorPeak();
   while(1); /* Run Once */
   // delay(2000); /* Repeat after delay */
 }
