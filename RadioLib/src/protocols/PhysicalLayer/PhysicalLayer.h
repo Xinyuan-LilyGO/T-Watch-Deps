@@ -4,22 +4,42 @@
 #include "../../TypeDef.h"
 #include "../../Module.h"
 
-// data rate structure interpretation in case LoRa is used
+/*!
+  \struct LoRaRate_t
+  \brief Data rate structure interpretation in case LoRa is used
+*/
 struct LoRaRate_t {
+  /*! \brief LoRa spreading factor */
   uint8_t spreadingFactor;
+  
+  /*! \brief LoRa bandwidth in kHz */
   float bandwidth;
+  
+  /*! \brief LoRa coding rate */
   uint8_t codingRate;
 };
 
-// data rate structure interpretation in case FSK is used
+/*!
+  \struct FSKRate_t
+  \brief Data rate structure interpretation in case FSK is used
+*/
 struct FSKRate_t {
+  /*! \brief FSK bit rate in kbps */
   float bitRate;
+  
+  /*! \brief FS frequency deviation in kHz*/
   float freqDev;
 };
 
-// common data rate
+/*!
+  \union DataRate_t
+  \brief Common data rate structure
+*/
 union DataRate_t {
+  /*! \brief Interpretation for LoRa modems */
   LoRaRate_t lora;
+
+  /*! \brief Interpretation for FSK modems */
   FSKRate_t fsk;
 };
 
@@ -124,7 +144,7 @@ class PhysicalLayer {
       \param len Packet length, needed for some modules under special circumstances (e.g. LoRa implicit header mode).
       \returns \ref status_codes
     */
-    virtual int16_t startReceive(uint32_t timeout, uint16_t irqFlags, uint16_t irqMask, size_t len);
+    virtual int16_t startReceive(uint32_t timeout, uint32_t irqFlags, uint32_t irqMask, size_t len);
 
     /*!
       \brief Binary receive method. Must be implemented in module class.
@@ -237,7 +257,7 @@ class PhysicalLayer {
 
     /*!
       \brief Sets FSK data encoding. Only available in FSK mode. Must be implemented in module class.
-      \param enc Encoding to be used. See \ref config_encoding for possible values.
+      \param encoding Encoding to be used. See \ref config_encoding for possible values.
       \returns \ref status_codes
     */
     virtual int16_t setEncoding(uint8_t encoding);
@@ -255,6 +275,14 @@ class PhysicalLayer {
       \returns \ref status_codes
     */
     virtual int16_t setOutputPower(int8_t power);
+
+    /*!
+      \brief Check if output power is configurable. Must be implemented in module class if the module supports it.
+      \param power Output power in dBm. The allowed range depends on the module used.
+      \param clipped Clipped output power value to what is possible within the module's range.
+      \returns \ref status_codes
+    */
+    virtual int16_t checkOutputPower(int8_t power, int8_t* clipped);
 
     /*!
       \brief Set sync word. Must be implemented in module class if the module supports it.
@@ -315,14 +343,14 @@ class PhysicalLayer {
       \param len Payload length in bytes.
       \returns Expected time-on-air in microseconds.
     */
-    virtual uint32_t getTimeOnAir(size_t len);
+    virtual RadioLibTime_t getTimeOnAir(size_t len);
 
     /*!
       \brief Calculate the timeout value for this specific module / series (in number of symbols or units of time)
       \param timeoutUs Timeout in microseconds to listen for
       \returns Timeout value in a unit that is specific for the used module
     */
-    virtual uint32_t calculateRxTimeout(uint32_t timeoutUs);
+    virtual RadioLibTime_t calculateRxTimeout(RadioLibTime_t timeoutUs);
 
     /*!
       \brief Create the flags that make up RxDone and RxTimeout used for receiving downlinks
@@ -330,11 +358,11 @@ class PhysicalLayer {
       \param irqMask Mask indicating which IRQ triggers a DIO
       \returns \ref status_codes
     */
-    virtual int16_t irqRxDoneRxTimeout(uint16_t &irqFlags, uint16_t &irqMask);
+    virtual int16_t irqRxDoneRxTimeout(uint32_t &irqFlags, uint32_t &irqMask);
 
     /*!
       \brief Check whether the IRQ bit for RxTimeout is set
-      \returns \ref RxTimeout IRQ is set
+      \returns Whether RxTimeout IRQ is set
     */
     virtual bool isRxTimeout();
 
@@ -487,8 +515,10 @@ class PhysicalLayer {
 
     #endif
 
-#if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
+#if !RADIOLIB_GODMODE
   protected:
+#endif
+#if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
     void updateDirectBuffer(uint8_t bit);
 #endif
 
@@ -499,15 +529,15 @@ class PhysicalLayer {
     size_t maxPacketLength;
 
     #if !RADIOLIB_EXCLUDE_DIRECT_RECEIVE
-    uint8_t bufferBitPos;
-    uint8_t bufferWritePos;
-    uint8_t bufferReadPos;
-    uint8_t buffer[RADIOLIB_STATIC_ARRAY_SIZE];
-    uint32_t syncBuffer;
-    uint32_t directSyncWord;
-    uint8_t directSyncWordLen;
-    uint32_t directSyncWordMask;
-    bool gotSync;
+    uint8_t bufferBitPos = 0;
+    uint8_t bufferWritePos = 0;
+    uint8_t bufferReadPos = 0;
+    uint8_t buffer[RADIOLIB_STATIC_ARRAY_SIZE] = { 0 };
+    uint32_t syncBuffer = 0;
+    uint32_t directSyncWord = 0;
+    uint8_t directSyncWordLen = 0;
+    uint32_t directSyncWordMask = 0;
+    bool gotSync = false;
     #endif
 
     virtual Module* getMod() = 0;

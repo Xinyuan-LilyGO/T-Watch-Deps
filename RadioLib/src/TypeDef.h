@@ -499,7 +499,7 @@
 #define RADIOLIB_ERR_INVALID_REVISION                           (-1103)
 
 /*!
-  \brief Invalid LoRaWAN uplink port requested by user.
+  \brief Invalid LoRaWAN uplink port requested by user, or downlink received at invalid port.
 */
 #define RADIOLIB_ERR_INVALID_PORT                               (-1104)
 
@@ -509,9 +509,9 @@
 #define RADIOLIB_ERR_NO_RX_WINDOW                               (-1105)
 
 /*!
-  \brief No valid channel for the currently active LoRaWAN band was found.
+  \brief There are no channels available for the requested datarate.
 */
-#define RADIOLIB_ERR_INVALID_CHANNEL                            (-1106)
+#define RADIOLIB_ERR_NO_CHANNEL_AVAILABLE                       (-1106)
 
 /*!
   \brief Invalid LoRaWAN MAC command ID.
@@ -529,29 +529,86 @@
 #define RADIOLIB_ERR_COMMAND_QUEUE_FULL                         (-1109)
 
 /*!
-  \brief Unable to pop existing MAC command because the queue is empty.
-*/
-#define RADIOLIB_ERR_COMMAND_QUEUE_EMPTY                        (-1110)
-
-/*!
   \brief Unable to delete MAC command because it was not found in the queue.
 */
-#define RADIOLIB_ERR_COMMAND_QUEUE_ITEM_NOT_FOUND               (-1111)
+#define RADIOLIB_ERR_COMMAND_QUEUE_ITEM_NOT_FOUND               (-1110)
 
 /*!
   \brief Unable to join network because JoinNonce is not higher than saved value.
 */
-#define RADIOLIB_ERR_JOIN_NONCE_INVALID                         (-1112)
+#define RADIOLIB_ERR_JOIN_NONCE_INVALID                         (-1111)
 
 /*!
   \brief Received downlink Network frame counter is invalid (lower than last heard value).
 */
-#define RADIOLIB_ERR_N_FCNT_DOWN_INVALID                        (-1113)
+#define RADIOLIB_ERR_N_FCNT_DOWN_INVALID                        (-1112)
 
 /*!
   \brief Received downlink Application frame counter is invalid (lower than last heard value).
 */
-#define RADIOLIB_ERR_A_FCNT_DOWN_INVALID                        (-1114)
+#define RADIOLIB_ERR_A_FCNT_DOWN_INVALID                        (-1113)
+
+/*!
+  \brief Uplink payload length at this datarate exceeds the active dwell time limitations.
+*/
+#define RADIOLIB_ERR_DWELL_TIME_EXCEEDED                        (-1114)
+
+/*!
+  \brief The buffer integrity check did not match the supplied checksum value.
+*/
+#define RADIOLIB_ERR_CHECKSUM_MISMATCH                          (-1115)
+
+/*!
+  \brief No downlink was received - most likely none was sent from the server.
+*/
+#define RADIOLIB_LORAWAN_NO_DOWNLINK                            (-1116)
+
+/*!
+  \brief The LoRaWAN session was successfully re-activated.
+*/
+#define RADIOLIB_LORAWAN_SESSION_RESTORED                       (-1117)
+
+/*!
+  \brief A new LoRaWAN session is started.
+*/
+#define RADIOLIB_LORAWAN_NEW_SESSION                            (-1118)
+
+/*!
+  \brief The supplied Nonces buffer is discarded as its activation information is invalid.
+*/
+#define RADIOLIB_LORAWAN_NONCES_DISCARDED                       (-1119)
+
+/*!
+  \brief The supplied Session buffer is discarded as it doesn't match the Nonces.
+*/
+#define RADIOLIB_LORAWAN_SESSION_DISCARDED                       (-1120)
+
+/*!
+  \brief The requested command is unavailable under the current LoRaWAN mode.
+*/
+#define RADIOLIB_LORAWAN_INVALID_MODE                            (-1121)
+
+// LR11x0-specific status codes
+
+/*!
+  \brief The selected 802.11 WiFi type is invalid.
+*/
+#define RADIOLIB_ERR_INVALID_WIFI_TYPE                          (-1200)
+
+/*!
+  \}
+*/
+
+/*!
+  \defgroup typedefs Type aliases used by RadioLib.
+
+  \{
+*/
+
+/*!
+  \brief Type used for durations in RadioLib
+*/
+typedef unsigned long RadioLibTime_t;
 
 /*!
   \}

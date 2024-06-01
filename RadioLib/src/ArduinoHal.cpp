@@ -2,10 +2,6 @@
 
 #if defined(RADIOLIB_BUILD_ARDUINO)
 
-#if !defined(RADIOLIB_EEPROM_UNSUPPORTED)
-#include <EEPROM.h>
-#endif
-
 ArduinoHal::ArduinoHal(): RadioLibHal(INPUT, OUTPUT, LOW, HIGH, RISING, FALLING), spi(&RADIOLIB_DEFAULT_SPI), initInterface(true) {}
 
 ArduinoHal::ArduinoHal(SPIClass& spi, SPISettings spiSettings): RadioLibHal(INPUT, OUTPUT, LOW, HIGH, RISING, FALLING), spi(&spi), spiSettings(spiSettings) {}
@@ -57,7 +53,7 @@ void inline ArduinoHal::detachInterrupt(uint32_t interruptNum) {
   ::detachInterrupt(interruptNum);
 }
 
-void inline ArduinoHal::delay(unsigned long ms) {
+void inline ArduinoHal::delay(RadioLibTime_t ms) {
 #if !defined(RADIOLIB_CLOCK_DRIFT_MS)
   ::delay(ms);
 #else
@@ -65,7 +61,7 @@ void inline ArduinoHal::delay(unsigned long ms) {
 #endif
 }
 
-void inline ArduinoHal::delayMicroseconds(unsigned long us) {
+void inline ArduinoHal::delayMicroseconds(RadioLibTime_t us) {
 #if !defined(RADIOLIB_CLOCK_DRIFT_MS)
   ::delayMicroseconds(us);
 #else
@@ -73,7 +69,7 @@ void inline ArduinoHal::delayMicroseconds(unsigned long us) {
 #endif
 }
 
-unsigned long inline ArduinoHal::millis() {
+RadioLibTime_t inline ArduinoHal::millis() {
 #if !defined(RADIOLIB_CLOCK_DRIFT_MS)
   return(::millis());
 #else
@@ -81,7 +77,7 @@ unsigned long inline ArduinoHal::millis() {
 #endif
 }
 
-unsigned long inline ArduinoHal::micros() {
+RadioLibTime_t inline ArduinoHal::micros() {
 #if !defined(RADIOLIB_CLOCK_DRIFT_MS)
   return(::micros());
 #else
@@ -89,7 +85,7 @@ unsigned long inline ArduinoHal::micros() {
 #endif
 }
 
-long inline ArduinoHal::pulseIn(uint32_t pin, uint32_t state, unsigned long timeout) {
+long inline ArduinoHal::pulseIn(uint32_t pin, uint32_t state, RadioLibTime_t timeout) {
   if(pin == RADIOLIB_NC) {
     return 0;
   }
@@ -118,48 +114,7 @@ void inline ArduinoHal::spiEnd() {
   spi->end();
 }
 
-void ArduinoHal::readPersistentStorage(uint32_t addr, uint8_t* buff, size_t len) {
-  #if !defined(RADIOLIB_EEPROM_UNSUPPORTED)
-    #if defined(RADIOLIB_ESP32) || defined(ARDUINO_ARCH_RP2040)
-      EEPROM.begin(RADIOLIB_HAL_PERSISTENT_STORAGE_SIZE);
-    #elif defined(ARDUINO_ARCH_APOLLO3)
-      EEPROM.init();
-    #endif
-    for(size_t i = 0; i < len; i++) {
-      buff[i] = EEPROM.read(addr + i);
-    }
-    #if defined(RADIOLIB_ESP32) || defined(ARDUINO_ARCH_RP2040)
-      EEPROM.end();
-    #endif
-  #else
-    (void)addr;
-    (void)buff;
-    (void)len;
-  #endif
-}
-
-void ArduinoHal::writePersistentStorage(uint32_t addr, uint8_t* buff, size_t len) {
-  #if !defined(RADIOLIB_EEPROM_UNSUPPORTED)
-    #if defined(RADIOLIB_ESP32) || defined(ARDUINO_ARCH_RP2040)
-      EEPROM.begin(RADIOLIB_HAL_PERSISTENT_STORAGE_SIZE);
-    #elif defined(ARDUINO_ARCH_APOLLO3)
-      EEPROM.init();
-    #endif
-    for(size_t i = 0; i < len; i++) {
-      EEPROM.write(addr + i, buff[i]);
-    }
-    #if defined(RADIOLIB_ESP32) || defined(ARDUINO_ARCH_RP2040)
-      EEPROM.commit();
-      EEPROM.end();
-    #endif
-  #else
-    (void)addr;
-    (void)buff;
-    (void)len;
-  #endif
-}
-
-void inline ArduinoHal::tone(uint32_t pin, unsigned int frequency, unsigned long duration) {
+void inline ArduinoHal::tone(uint32_t pin, unsigned int frequency, RadioLibTime_t duration) {
   #if !defined(RADIOLIB_TONE_UNSUPPORTED)
     if(pin == RADIOLIB_NC) {
       return;
